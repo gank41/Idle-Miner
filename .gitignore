@@ -1,0 +1,40 @@
+# Publish only the app source, build resources, tests, and public documentation.
+/*
+!/.gitignore
+!/README.md
+!/HOWTO.md
+!/PRIVACY.md
+!/THIRD-PARTY-NOTICES.md
+!/LICENSE
+!/CHANGELOG.md
+!/BUILDING.md
+!/build.sh
+!/test.sh
+!/Sources/
+!/Tests/
+!/macOS/
+!/Linux/
+!/docs/
+!/tools/
+# Keep internal project plans and relocation records local.
+/docs/*
+!/docs/index.html
+!/docs/site.css
+!/docs/site.js
+!/docs/.nojekyll
+!/docs/assets/
+!/docs/releases/
+# No user state, audit receipts, backups, installers, or build outputs.
+.DS_Store
+Icon?
+__pycache__/
+*.pyc
+*.log
+settings.json
+*.lock
+/Linux/verification/
+.env
+.env.*
+*.p12
+*.p8
+*.pem

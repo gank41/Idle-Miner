@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b172a">
+  <meta name="description" content="Idle Miner is an open-source CPU mining app for Apple Silicon Macs and Linux. Choose Litecoin, Dogecoin or Bitcoin payouts, with shared CPU limits and automatic idle control.">
+  <meta property="og:title" content="Idle Miner — Spare CPU. Your choice.">
+  <meta property="og:description" content="An open-source CPU mining app for Mac and Linux. Start on your terms, see the work, and understand the payouts.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://gank41.github.io/Idle-Miner/">
+  <meta property="og:image" content="https://gank41.github.io/Idle-Miner/assets/idle-miner.png">
+  <title>Idle Miner — CPU mining for Mac &amp; Linux</title>
+  <link rel="icon" type="image/png" href="assets/idle-miner.png">
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="#" aria-label="Idle Miner home"><img src="assets/idle-miner.png" width="42" height="42" alt=""><span>Idle Miner</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#how-it-works">How it works</a>
+      <a href="https://github.com/gank41/Idle-Miner/blob/main/HOWTO.md">Guide</a>
+      <a class="nav-download" href="#downloads">Download <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="tiny-moon" aria-hidden="true">☾</span> Open-source CPU mining</p>
+        <h1 id="hero-title">Spare CPU.<br><span>Your choice.</span></h1>
+        <p class="hero-description">A small desktop app that puts spare computing time to work. Mine with RandomX, and choose payouts in Litecoin, Dogecoin or Bitcoin through unMineable.</p>
+        <div class="hero-actions"><a class="button primary" href="#downloads">Get Idle Miner <span aria-hidden="true">↓</span></a><a class="text-link" href="https://github.com/gank41/Idle-Miner/blob/main/HOWTO.md">Read the setup guide <span aria-hidden="true">↗</span></a></div>
+        <p class="hero-note">For Apple Silicon Macs &amp; 64-bit Linux · Free software · GPL-3.0</p>
+      </div>
+      <div class="hero-art" aria-label="Idle Miner app icon and available payout currencies">
+        <div class="icon-halo"><img class="hero-icon" src="assets/idle-miner.png" alt="Idle Miner icon: a computer with a Bitcoin symbol and a crescent moon" width="280" height="280" fetchpriority="high"></div>
+        <div class="coin-strip"><span><b>LTC</b> Litecoin</span><span><b>DOGE</b> Dogecoin</span><span><b>BTC</b> Bitcoin</span></div>
+        <p>You choose when to start.</p>
+      </div>
+    </section>
+
+    <div class="principles wrap" aria-label="App essentials">
+      <p><span aria-hidden="true">◷</span> Less CPU while you work</p>
+      <p><span aria-hidden="true">⌘</span> Shared limits across currencies</p>
+      <p><span aria-hidden="true">○</span> Opens stopped by default</p>
+    </div>
+
+    <section class="section wrap" id="how-it-works" aria-labelledby="works-title">
+      <div class="section-heading"><p class="eyebrow">The idea</p><h2 id="works-title">Your computer does the work.<br>You stay in control.</h2><p>Mining means using your CPU to perform calculations for a cryptocurrency network. Idle Miner uses the XMRig engine for RandomX / Monero mining. The provider converts credited work into your selected payout currency.</p></div>
+      <div class="feature-grid">
+        <article class="feature"><span class="feature-number">01</span><h3>Set it, then start it</h3><p>Save a public Receive address, choose a currency, and select <strong>Start Mining</strong>. Installing, opening the app, or enabling Start at Login never starts mining on its own.</p></article>
+        <article class="feature"><span class="feature-number">02</span><h3>Give your work room</h3><p>Automatic mode uses one thread while you’re active and increases after five minutes idle. You can choose to pause completely while active. Battery, heat, sleep, memory and sustained CPU load can pause or reduce mining.</p></article>
+        <article class="feature"><span class="feature-number">03</span><h3>See what’s happening</h3><p>Mining Stats shows local activity alongside provider balance and payout progress. Accepted shares are work accepted by the pool, not wallet deposits. The provider handles payouts; Idle Miner does not move funds.</p></article>
+      </div>
+      <p class="quiet-note">Mining uses electricity and can increase heat and fan activity. Rewards vary with your hardware, pool conditions and coin prices; they may not cover your costs. Estimates do not deduct electricity. XMRig retains its 1% developer donation, and provider fees and payout rules also apply.</p>
+    </section>
+
+    <section class="download-section" id="downloads" aria-labelledby="download-title">
+      <div class="wrap">
+        <div class="download-heading"><div><p class="eyebrow">Make it yours</p><h2 id="download-title">Download Idle Miner</h2></div><a class="version-tag" href="https://github.com/gank41/Idle-Miner/releases/tag/v1.6.1">Version 1.6.1 <span>Build 9</span> <span aria-hidden="true">↗</span></a></div>
+        <div class="download-grid">
+          <article class="download-card" aria-labelledby="mac-title">
+            <div class="platform-heading"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="4" width="26" height="18" rx="2"></rect><path d="M12 28h8M16 22v6"></path></svg><div><h3 id="mac-title">macOS</h3><p>Apple Silicon · macOS 14 or later</p></div></div>
+            <p>A native Mac app with a menu bar icon, an optional Dock icon, and resizable Mining Stats.</p>
+            <a class="button primary download-button" href="https://github.com/gank41/Idle-Miner/releases/download/v1.6.1/Idle-Miner-1.6.1-macOS.dmg">Download for Mac <span aria-hidden="true">↓</span></a>
+            <p class="file-detail">DMG disk image · Apple Silicon</p>
+            <ol class="install-steps"><li>Open the DMG and drag Idle Miner to Applications.</li><li>Eject the disk image, then open the app from Applications.</li><li>Open Settings, add your Receive address, and start when ready.</li></ol>
+            <aside class="install-note"><strong>First launch on Mac</strong><p>This build is signed locally (ad hoc) and is not Apple-notarized. macOS may block the first launch. If you trust this download, follow <a href="https://support.apple.com/en-us/102445">Apple’s instructions for opening an unnotarized app</a>.</p></aside>
+          </article>
+          <article class="download-card" aria-labelledby="linux-title">
+            <div class="platform-heading"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="4" width="26" height="24" rx="3"></rect><path d="m8 11 5 5-5 5M17 21h7"></path></svg><div><h3 id="linux-title">Linux</h3><p>64-bit ARM64 or x86_64 · Source installer</p></div></div>
+            <p>For Fedora, Fedora Asahi, Ubuntu and recent Debian-family desktops with the required packages.</p>
+            <a class="button secondary download-button" href="https://github.com/gank41/Idle-Miner/releases/download/v1.6.1/Idle-Miner-1.6.1-Linux.tar.gz">Download for Linux <span aria-hidden="true">↓</span></a>
+            <p class="file-detail">tar.gz archive · Builds for your computer</p>
+            <ol class="install-steps"><li>Extract the archive and open Terminal in its folder.</li><li>Run <code>bash install.sh</code> as your normal desktop user.</li><li>Allow several minutes, then open Idle Miner from your launcher.</li></ol>
+            <aside class="install-note"><strong>Check your distribution</strong><p>The installer needs internet for dependencies and may request sudo for system packages. Qt 6 / PySide6 and KDE Frameworks 6 development packages must be available. Older Ubuntu or Debian releases may lack them.</p></aside>
+          </article>
+        </div>
+        <div class="release-notes"><p><strong>Already using Idle Miner?</strong> Quit all currency instances before replacing or reinstalling. Saved wallets and settings are retained. Version 1.6.1 makes Mining Stats larger and resizable.</p><p><strong>Platform checks:</strong> macOS 1.6.1 was tested natively. Linux 1.6 has historical Ubuntu and Fedora checks; the new 1.6.1 native Linux desktop build and native Asahi 1.6.1 remain unverified. Run the one-thread Offline Test after installing.</p><a class="text-link" href="https://github.com/gank41/Idle-Miner/releases">All releases &amp; release notes <span aria-hidden="true">↗</span></a></div>
+      </div>
+    </section>
+
+    <section class="section wrap" id="getting-started" aria-labelledby="setup-title">
+      <div class="section-heading"><p class="eyebrow">A simple first session</p><h2 id="setup-title">Three steps to get started.</h2></div>
+      <ol class="setup-grid">
+        <li><span class="step-mark" aria-hidden="true">1</span><h3>Copy your Receive address</h3><p>In your wallet, select Litecoin, Dogecoin or Bitcoin and use <strong>Receive</strong>. Copy the public address for that currency’s native network. No seed phrase, private key or wallet password belongs in Idle Miner.</p></li>
+        <li><span class="step-mark" aria-hidden="true">2</span><h3>Save your preferences</h3><p>Open <strong>Settings</strong>. Save the addresses you want to use, choose your currency and the shared CPU limit. Leave unused wallets blank. Saving Settings stops mining so you can review your changes.</p></li>
+        <li><span class="step-mark" aria-hidden="true">3</span><h3>Start, watch, stop</h3><p>Select <strong>Start Mining</strong> for automatic mode. Open <strong>Mining Stats</strong> to see current work and provider reporting. Use <strong>Stop</strong> whenever you want to end the session.</p></li>
+      </ol>
+      <a class="text-link" href="https://github.com/gank41/Idle-Miner/blob/main/HOWTO.md">Follow the complete guide: installation, wallets, payments &amp; troubleshooting <span aria-hidden="true">↗</span></a>
+    </section>
+
+    <section class="control-section wrap" aria-labelledby="control-title">
+      <div class="control-copy"><p class="eyebrow">Your pace</p><h2 id="control-title">More control.<br>Less guesswork.</h2><p>Let automatic mode adapt to your activity, or use a timed Boost when you want to allow more CPU. You can end Boost early; its timer returns you to automatic mode.</p><div class="duration-list" aria-label="Boost durations"><span>15 min</span><span>30 min</span><span>1 hour</span><span>6 hours</span><span>12 hours</span><span>24 hours</span></div><p class="quiet-note">Boost still respects shared CPU capacity, battery, heat, sleep and memory protections.</p></div>
+      <div class="control-details"><article><h3>One shared CPU allowance</h3><p>Choose a total of 2, 4, 8 or 12 threads. All currency instances share that limit, with two CPU cores reserved where possible. Opening another currency does not double the allowance.</p></article><article><h3>Multiple currencies, separate work</h3><p><strong>Open Another Currency</strong> opens a stopped instance with its own Stats and logs. Only one instance may mine each currency. Each engine needs a separate RandomX dataset of about 2 GB. Linux requires at least 3 GB of free memory per engine to start; additional currencies need additional memory.</p></article><article><h3>A status you can read</h3><ul class="status-list"><li><span class="status-dot green" aria-hidden="true"></span><strong>Green</strong> — fresh, confirmed work</li><li><span class="status-dot red" aria-hidden="true"></span><strong>Red</strong> — an engine, connection or reporting issue</li><li><span class="status-dot gray" aria-hidden="true"></span><strong>Gray</strong> — stopped, paused or starting</li></ul></article></div>
+    </section>
+
+    <section class="section wrap faq-section" id="questions" aria-labelledby="questions-title">
+      <div class="section-heading"><p class="eyebrow">Good to know</p><h2 id="questions-title">Before you press Start.</h2></div>
+      <div class="faq-list">
+        <details><summary>How do payments reach my wallet?</summary><div class="answer"><p>Your public Receive address tells unMineable where to send the selected coin. The provider records your rewards in its pool balance. Automatic payout happens only if it is configured with the provider and the current payout threshold and rules are met.</p><p>Use <strong>Pool Payouts</strong> to check the provider dashboard. Idle Miner does not send funds, change provider payout settings or guarantee a payment schedule. Check current fees, thresholds and network support there.</p></div></details>
+        <details><summary>What do the Stats numbers mean?</summary><div class="answer"><p><strong>Hashrate</strong> is the speed of mining calculations. <strong>Accepted shares</strong> are work the pool accepted, not deposits. <strong>Pool balance</strong> is the provider’s accounted reward balance; reporting and prices can lag.</p><p><strong>Session elapsed</strong> includes automatic pauses and freezes when you stop. A new Start begins a new session. <strong>Hashing time</strong> counts observed positive work; <strong>app uptime</strong> continues while the app is open. Each currency has separate accounting.</p></div></details>
+        <details><summary>Which wallet addresses can I use?</summary><div class="answer"><p>Use a public Receive address on the selected coin’s native network. Native Litecoin, Dogecoin and Bitcoin addresses are supported; wrapped coins and addresses for another currency are not. Bitcoin Lightning and Taproot, and Litecoin MWEB addresses are not supported by this build.</p><p>Save each currency’s address in its matching Settings field. <strong>Switch Currency</strong> stops the previous engine before switching to the saved target. A missing target address opens Settings.</p></div></details>
+        <details><summary>Where is the app, and will it start at login?</summary><div class="answer"><p>On Mac, menu-bar-only is the default. Settings lets you show a Dock icon, a menu bar icon, or both. Keep at least one enabled. On Linux, use the window/taskbar and optional tray; if your desktop has no usable tray, the window stays available.</p><p><strong>Start at Login</strong> opens the default instance stopped. Additional currency instances must be opened and started separately.</p></div></details>
+        <details><summary>Can I try it without a wallet or a pool connection?</summary><div class="answer"><p>Yes. Run the one-thread <strong>Offline Test</strong> for up to 70 seconds to check local hashing. It connects to no pool and earns nothing. It is a useful first check after a Linux install.</p><p>On virtual machines, guest activity, battery and temperature can differ from the host. Use modest CPU and RAM allocations and stop if the host becomes less responsive. Native Asahi hardware operation remains unverified.</p></div></details>
+        <details><summary>Is the source available?</summary><div class="answer"><p>Yes. Idle Miner is free software under GPL-3.0. The app source and corresponding XMRig source and licenses are available in the repository and release packages. You can inspect, build, modify and share it under the license terms.</p><p><a href="https://github.com/gank41/Idle-Miner">Browse the source</a> · <a href="https://github.com/gank41/Idle-Miner/blob/main/LICENSE">Read the license</a></p></div></details>
+      </div>
+    </section>
+
+    <section class="closing wrap" aria-labelledby="closing-title"><div><p class="eyebrow">Start with the basics</p><h2 id="closing-title">Your computer. Your call.</h2><p>Choose a platform, read the guide, and start when you’re ready.</p></div><a class="button primary" href="#downloads">Choose your download <span aria-hidden="true">↑</span></a></section>
+  </main>
+
+  <footer class="site-footer wrap"><div class="footer-brand"><img src="assets/idle-miner.png" width="36" height="36" alt=""><p><strong>Idle Miner</strong><span>By Jeffry Zander</span></p></div><nav aria-label="Footer navigation"><a href="https://github.com/gank41/Idle-Miner">Source on GitHub</a><a href="https://github.com/gank41/Idle-Miner/blob/main/HOWTO.md">Help &amp; tutorials</a><a href="https://github.com/gank41/Idle-Miner/releases">Releases</a><a href="https://github.com/gank41/Idle-Miner/blob/main/LICENSE">GPL-3.0</a><a href="https://github.com/gank41/Idle-Miner/blob/main/PRIVACY.md">Privacy</a><a href="https://github.com/gank41/Idle-Miner/blob/main/THIRD-PARTY-NOTICES.md">Third-party notices</a></nav><p class="footer-note">A desktop app. This website does not mine or collect wallet information.</p></footer>
+</body>
+</html>

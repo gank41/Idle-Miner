@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(idle_monitor LANGUAGES CXX)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui)
+find_package(KF6IdleTime REQUIRED)
+add_executable(idle-monitor main.cpp)
+target_link_libraries(idle-monitor Qt6::Core Qt6::Gui KF6::IdleTime)

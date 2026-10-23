@@ -4,7 +4,7 @@ extension MinerApp {
  func applyMiningHealth(_ health:MiningHealth) {
   let color:NSColor
   switch health.level { case .working: color = .systemGreen; case .issue: color = .systemRed; case .inactive: color = .systemGray }
-  let icon=(coordinator?.peers ?? 1)>1 ? "₿ \(settings.coin)" : "₿"
+  let icon="₿"
   if lastHealthLevel != health.level || lastIconText != icon {
    lastIconText=icon
    lastHealthLevel=health.level
@@ -42,6 +42,8 @@ extension MinerApp {
    rateItem.title=engine.running ? "RandomX: \(current.map{String(format:"%.1f",$0)} ?? "—") H/s → \(coin)" : "Payout currency: \(coin)"
   }
   menuSummary.update([stateItem,healthItem,rateItem,sharesItem,priceItem,balanceItem].map(\.title))
+  let level=health.level == .working ? "working" : health.level == .issue ? "issue" : "inactive"
+  refreshSharedMenu(level:level,lines:[stateItem,healthItem,rateItem,sharesItem,priceItem,balanceItem].map(\.title))
   guard let view=statsWindow,view.window.isVisible else { return }
   view.state.stringValue=stateItem.title+"\n"+health.message
   let began=sessionClock.startedDate.map{DateFormatter.localizedString(from:$0,dateStyle:.medium,timeStyle:.medium)} ?? "Not started yet"

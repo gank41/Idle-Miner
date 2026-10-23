@@ -1,4 +1,4 @@
-IDLE MINER 1.7 (BUILD 10) FOR LINUX
+IDLE MINER 1.8 (BUILD 11) FOR LINUX
 By Jeffry Zander
 
 INSTALL
@@ -56,9 +56,15 @@ VISIBILITY
 Settings offers window / taskbar and tray / menu bar switches. Keep at
 least one selected. Linux defaults to both. If the desktop has no usable
 tray, the window always remains visible and explains why. Closing hides
-only when a visible usable tray exists; otherwise closing quits and stops
-mining. The tray symbol is green for fresh work, red for an engine,
-connection or reporting issue, gray for stopped/paused/starting. GNOME may
+only when the shared usable tray exists; otherwise closing quits and stops
+mining. All current currency profiles share one Bitcoin tray symbol. Hover
+a currency row for its summary, stats and controls. Row symbols are green
+for fresh work, red for an engine, connection or reporting issue, and gray
+for stopped/paused/starting or stale reports. Configured currencies that
+are not running can be opened stopped. Quit This Currency leaves other
+profiles running; Quit Idle Miner asks every current profile to quit. A
+remaining profile takes over if the tray owner quits or crashes. Older
+versions must be quit and updated to remove their separate icons. GNOME may
 need a tray extension; the regular window works without one.
 Start at Login launches the default profile stopped by default. Directly
 below it, "Start at Login and Start Mining configured currencies" is an
@@ -72,6 +78,14 @@ launches stay stopped. Reinstall updates an existing autostart entry and
 preserves its enabled/disabled state; it does not enable autostart.
 The offline test uses
 one thread for up to 70 seconds, connects to no pool and earns nothing.
+
+UPDATES
+Check for Updates reads the HTTPS stable manifest at
+https://idleminer.app/updates/stable.json only when requested. It compares
+version and build numbers and offers the Linux installer or release notes
+in your browser. It never installs automatically or stops mining. Offline
+or unavailable checks show a retry message; checks are limited to one
+every 30 seconds. Quit every currency before running a downloaded installer.
 
 LINUX / ASAHI / VM NOTES
 Uses GNOME Mutter idle monitoring or KDE KIdleTime. KDE detection stays

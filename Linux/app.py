@@ -2,7 +2,7 @@
 """Idle Miner for Linux. A user session app; never a privileged mining service."""
 import os,sys,json,signal,fcntl,shutil,uuid,time,subprocess
 from pathlib import Path
-from PySide6.QtCore import Qt,QTimer,QProcess,QUrl,QPointF,QDateTime,QLocale
+from PySide6.QtCore import Qt,QTimer,QProcess,QUrl,QPointF,QDateTime,QLocale,QObject,Signal
 from PySide6.QtGui import QIcon,QPixmap,QPainter,QPen,QColor,QFont,QDesktopServices,QAction
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QMenu,QSystemTrayIcon,QDialog,QFormLayout,QLineEdit,QComboBox,QCheckBox,QDialogButtonBox,QMessageBox,QPlainTextEdit,QTabWidget,QWidgetAction,QScrollArea)
 from core import VERSION,BUILD,DEFAULTS,COINS,DURATIONS,Work,SessionClock,duration,now,validated,valid_wallet,threads,config
@@ -10,10 +10,18 @@ from coordination import SettingsStore,Coordinator,atomic
 from startup import startup_plan,autostart_enabled,login_entry,save_login_preference
 from platform_linux import Sensors
 from network import Network
+from shared_tray import SharedTray,profile_currency,focus_matches
+from updates import check_async,newer
 ROOT=Path(__file__).resolve().parent
 STATE=Path(os.environ.get('IDLE_MINER_STATE',str(Path.home()/'.config/idle-miner')))
 PROFILE=next((arg.split('=',1)[1] for arg in sys.argv if arg.startswith('--profile=')),'default')
 AUTOSTART=Path.home()/'.config/autostart/idle-miner.desktop'
+
+def profile_conflict_message(coin,current):
+ return f'The {coin} profile is currently showing {current}. Use Switch Currency in that window, or quit that profile, before opening {coin}.' if current else 'This currency profile is busy and has not reported its current currency. Try again in a moment.'
+
+class UpdateBridge(QObject):
+ ready=Signal(object)
 
 class Graph(QWidget):
  def __init__(self,work):
@@ -71,9 +79,10 @@ class Window(QMainWindow):
   layout.addStretch();scroll=QScrollArea();scroll.setWidgetResizable(True);scroll.setFrameShape(QScrollArea.Shape.NoFrame);scroll.setWidget(page);self.tabs.addTab(scroll,'Mining Stats')
   self.log=QPlainTextEdit();self.log.setReadOnly(True);self.log.document().setMaximumBlockCount(1200);self.tabs.addTab(self.log,'Engine Log')
   menu=self.menuBar().addMenu('Idle Miner');self.populate(menu)
+  self.shared_tray=SharedTray(STATE,self.coordinator);self.currency_menus={};self.update_busy=False;self.update_last=-1000;self.quit_group=None;self.update_bridge=UpdateBridge(self);self.update_bridge.ready.connect(self.update_result)
   self.tray=QSystemTrayIcon(QIcon(str(ROOT/'icon.png')),self);self.tray_menu=QMenu()
   self.summary=QLabel('Stopped');self.summary.setWordWrap(True);self.summary.setContentsMargins(14,10,14,10);self.summary.setMinimumWidth(320)
-  summary_action=QWidgetAction(self.tray_menu);summary_action.setDefaultWidget(self.summary);self.tray_menu.addAction(summary_action);self.tray_menu.addSeparator();self.populate(self.tray_menu)
+  self.tray_menu.aboutToShow.connect(self.rebuild_tray_menu);self.rebuild_tray_menu()
   self.tray.setContextMenu(self.tray_menu);self.tray.activated.connect(lambda reason:self.showNormal() if reason==QSystemTrayIcon.ActivationReason.Trigger else None)
   self.last_color=None;self.apply_visibility()
   self.timer=QTimer(self);self.timer.timeout.connect(self.tick);self.timer.start(1000);self.tick()
@@ -89,7 +98,9 @@ class Window(QMainWindow):
   for coin in COINS:
    currencies.addAction(coin,lambda c=coin:self.switch_currency(c))
    another.addAction(coin,lambda c=coin:self.open_currency(c))
-  menu.addAction('About Idle Miner',self.about);menu.addSeparator();menu.addAction('Quit Idle Miner',self.quit)
+  menu.addAction('Engine Log',self.show_log);menu.addAction('Refresh Stats',lambda:self.refresh(True));menu.addAction('Pool Payouts',self.open_pool)
+  menu.addAction('Check for Updates…',self.check_updates);menu.addAction('About Idle Miner',self.about);menu.addSeparator();menu.addAction('Quit This Currency',self.quit);menu.addAction('Quit Idle Miner',self.quit_all)
+ def show_log(self):self.tabs.setCurrentIndex(1);self.showNormal();self.raise_();self.activateWindow()
  def show_stats(self):self.tabs.setCurrentIndex(0);self.showNormal();self.raise_();self.activateWindow()
  def start(self):
   if self.enabled or self.proc is not None:return
@@ -165,8 +176,15 @@ class Window(QMainWindow):
   self.configpath.unlink(missing_ok=True)
  def tick(self):
   t=now()
+  if self.quitting:return
+  for action in self.shared_tray.take_commands(self.settings['coin']):
+   if action.startswith('boost:'):self.boost(int(action.split(':')[1]))
+   else:
+    handler={'show_stats':self.show_stats,'show_log':self.show_log,'start':self.start,'stop':self.stop,'end_boost':self.end_boost,'settings':self.settings_dialog,'pool':self.open_pool,'refresh':lambda:self.refresh(True),'quit':self.quit}.get(action)
+    if handler:handler()
+   if self.quitting:return
   self.refresh_settings()
-  if self.coordinator.take_focus():self.show_stats()
+  if self.coordinator.take_focus(self.settings['coin']):self.show_stats()
   self.clock.sample(bool(self.proc and self.engine_ready and not self.stopping and self.work.rate and t-self.work.updated<=30),t)
   if self.pending_coin and self.proc is None:self.finish_switch()
   if t-self.last_tick>10:self.resume_until=t+10;self.stop_engine()
@@ -203,13 +221,13 @@ class Window(QMainWindow):
    if self.boost_until:
     remaining=int(self.boost_until-t);state+=f' · {remaining//3600}:{remaining//60%60:02}:{remaining%60:02} left'
   color,message=self.work.health(bool(desired),self.proc is not None,self.stopping or bool(self.change_deadline),self.fatal,'' if self.benchmark_until else self.net_error)
-  if color!=self.last_color:
-   pix=QPixmap(40,40);pix.fill(Qt.GlobalColor.transparent);p=QPainter(pix);p.setRenderHint(QPainter.RenderHint.Antialiasing);p.setPen(QColor({'green':'#25a65a','red':'#e04444','gray':'#8b8b8b'}[color]));p.setFont(QFont('sans',27,QFont.Weight.Bold));p.drawText(pix.rect(),Qt.AlignmentFlag.AlignCenter,'₿');p.end();self.tray.setIcon(QIcon(pix));self.last_color=color
-  self.state_label.setText(state);self.health.setText(message);self.tray.setToolTip('Idle Miner · '+state+'\n'+message)
+  self.state_label.setText(state);self.health.setText(message)
   rate=f'{self.work.rate:.1f} H/s' if self.proc and self.work.rate is not None and t-self.work.updated<=30 else 'Awaiting a fresh sample' if self.proc else '—'
   self.rate.setText('RandomX: '+rate+' → '+self.settings['coin']);self.shares.setText(f'Accepted shares this session: {self.work.accepted} · Rejected: {self.work.rejected}')
   self.timing.setText(('Session started: '+QLocale.system().toString(QDateTime.fromMSecsSinceEpoch(int(self.clock.wall*1000)),QLocale.FormatType.ShortFormat) if self.clock.wall is not None else 'Session: not started')+'\nSession runtime: '+duration(self.clock.elapsed())+' · Hashing: '+duration(self.clock.hashing)+' · App uptime: '+duration(self.clock.uptime()))
   self.render_money();self.summary.setText(state+'\n'+message+'\n'+self.rate.text()+'\n'+self.money.text().split('\n')[0])
+  self.shared_tray.publish(self.settings['coin'],dict(color=color,state=state,health='Issue: check this currency window.' if self.fatal else message,rate=self.rate.text(),shares=self.shares.text(),timing=self.timing.text(),money=self.money.text()))
+  self.update_shared_tray()
   notices=[]
   if not e.idle_known:notices.append('Idle detection is awaiting confirmation; automatic mode stays light. KDE confirms after its first idle event.')
   if self.sensors.virtual:notices.append('Virtual machine: host battery, temperature and activity are not visible. Keep the host plugged in; this VM follows guest activity.')
@@ -246,9 +264,84 @@ class Window(QMainWindow):
   else:lines.append('Pool earnings: awaiting confirmation' if self.settings['pool_stats'] else 'Pool earnings: disabled in Settings')
   if self.net_error:lines.append(self.net_error)
   self.money.setText('\n'.join(lines))
+ def status_icon(self,color,glyph='●'):
+  pix=QPixmap(40,40);pix.fill(Qt.GlobalColor.transparent);p=QPainter(pix);p.setRenderHint(QPainter.RenderHint.Antialiasing);p.setPen(QColor({'green':'#25a65a','red':'#e04444','gray':'#8b8b8b'}[color]));p.setFont(QFont('sans',27,QFont.Weight.Bold));p.drawText(pix.rect(),Qt.AlignmentFlag.AlignCenter,glyph);p.end();return QIcon(pix)
+ def update_shared_tray(self):
+  owner=self.shared_tray.elect();available=QSystemTrayIcon.isSystemTrayAvailable()
+  self.tray.setVisible(owner and available and self.settings['show_menu_bar'])
+  snapshots=self.shared_tray.snapshots()
+  colors=[row['color'] for row in snapshots.values()]
+  color='red' if 'red' in colors else 'green' if 'green' in colors else 'gray'
+  if color!=self.last_color:self.tray.setIcon(self.status_icon(color,'₿'));self.last_color=color
+  self.tray.setToolTip('Idle Miner · '+str(len(snapshots))+' currencies running')
+  for coin,menu in self.currency_menus.items():
+   row=snapshots.get(coin);menu.setIcon(self.status_icon(row['color'] if row else 'gray'))
+ def rebuild_tray_menu(self):
+  self.tray_menu.clear();self.currency_menus={};rows=self.shared_tray.snapshots()
+  title=self.tray_menu.addAction('Idle Miner');title.setEnabled(False);self.tray_menu.addSeparator()
+  for coin in COINS:
+   if coin not in rows and not valid_wallet(self.settings['wallets'][coin],coin):continue
+   menu=self.tray_menu.addMenu(coin);self.currency_menus[coin]=menu
+   menu.aboutToShow.connect(lambda c=coin,m=menu:self.populate_currency(m,c))
+   menu.setIcon(self.status_icon(rows[coin]['color'] if coin in rows else 'gray'));self.populate_currency(menu,coin)
+  self.tray_menu.addSeparator();self.tray_menu.addAction('Settings…',self.settings_dialog)
+  self.tray_menu.addAction('Check for Updates…',self.check_updates);self.tray_menu.addAction('About Idle Miner',self.about)
+  self.tray_menu.addSeparator();self.tray_menu.addAction('Quit Idle Miner',self.quit_all)
+ def populate_currency(self,menu,coin):
+  menu.clear();row=self.shared_tray.snapshots().get(coin)
+  if row is None:
+   status=menu.addAction('Not running');status.setEnabled(False)
+   menu.addAction('Open '+coin+' · Stopped',lambda:self.open_currency(coin));return
+  for key in ('state','health','rate','shares','timing','money'):
+   for line in row[key].splitlines():
+    if line:action=menu.addAction(line);action.setEnabled(False)
+  menu.addSeparator()
+  for label,command in [('Mining Stats','show_stats'),('Start Mining','start'),('Stop Mining','stop')]:
+   action=menu.addAction(label,lambda c=coin,a=command:self.dispatch_currency(c,a));action.setEnabled(row['fresh'])
+  boost=menu.addMenu('Boost Mining');boost.setEnabled(row['fresh'])
+  for minutes in DURATIONS:boost.addAction(f'{minutes} Min' if minutes<60 else f'{minutes//60} Hour'+('s' if minutes>60 else ''),lambda c=coin,m=minutes:self.dispatch_currency(c,'boost:'+str(m)))
+  for label,command in [('End Boost · Return to Automatic','end_boost'),('Settings…','settings'),('Pool Payouts','pool'),('Refresh Stats','refresh'),('Engine Log','show_log'),('Quit This Currency','quit')]:
+   action=menu.addAction(label,lambda c=coin,a=command:self.dispatch_currency(c,a));action.setEnabled(row['fresh'])
+ def dispatch_currency(self,coin,action):
+  row=self.shared_tray.snapshots().get(coin)
+  if row and row['fresh']:
+   if not self.shared_tray.send(row,action):QMessageBox.warning(self,'Currency is busy','This currency could not receive the action. Try again in a moment.')
+  else:QMessageBox.information(self,'Currency status unavailable','This currency is not reporting a fresh status. Open its window and try again.')
+ def quit_all(self):
+  if self.quit_group is not None:return
+  targets=[row for row in self.shared_tray.snapshots(by_profile=True).values() if row['profile']!=self.profile]
+  failed=False
+  for row in targets:
+   if not self.shared_tray.send(row,'quit'):failed=True
+  if failed:QMessageBox.warning(self,'Some currencies are busy','A currency could not receive Quit. Wait a moment and try Quit Idle Miner again.');return
+  if not targets:self.quit();return
+  self.quit_group=targets;self.quit_deadline=now()+12;self.stop();self.check_quit_all()
+ def check_quit_all(self):
+  if self.quitting or self.quit_group is None:return
+  live=self.shared_tray.snapshots(by_profile=True)
+  remaining=[row for row in self.quit_group if row['profile'] in live and live[row['profile']]['pid']==row['pid'] and live[row['profile']]['nonce']==row['nonce']]
+  if not remaining:self.quit_group=None;self.quit();return
+  if now()>=self.quit_deadline:
+   self.quit_group=None;self.show_stats();QMessageBox.warning(self,'A currency is still stopping','Wait for the remaining currency to stop, then try Quit Idle Miner again.');return
+  QTimer.singleShot(250,self.check_quit_all)
+ def check_updates(self):
+  if self.update_busy:QMessageBox.information(self,'Checking for updates','An update check is already in progress.');return
+  if now()-self.update_last<30:QMessageBox.information(self,'Check for Updates','Please wait a moment before checking again.');return
+  self.update_busy=True;self.update_last=now();check_async(self.update_bridge.ready.emit)
+ def update_result(self,result):
+  self.update_busy=False
+  if self.quitting:return
+  if result['error']:QMessageBox.warning(self,'Update check failed',result['error']);return
+  release=result['manifest']
+  if not newer(release['version'],release['build'],VERSION,BUILD):QMessageBox.information(self,'Idle Miner is up to date',f'Version {VERSION} ({BUILD}) is the latest available version.');return
+  dialog=QMessageBox(self);dialog.setWindowTitle('Idle Miner update available');dialog.setText(f"Idle Miner {release['version']} ({release['build']}) is available.")
+  dialog.setInformativeText('Download the Linux installer in your browser. Quit all Idle Miner currencies before running the installer. Your mining session continues until you choose to stop it.')
+  download=dialog.addButton('Download Installer',QMessageBox.ButtonRole.AcceptRole);notes=dialog.addButton('Release Notes',QMessageBox.ButtonRole.HelpRole);dialog.addButton(QMessageBox.StandardButton.Cancel);dialog.exec()
+  if dialog.clickedButton()==download:QDesktopServices.openUrl(QUrl(release['url']))
+  elif dialog.clickedButton()==notes:QDesktopServices.openUrl(QUrl(release['releaseNotesURL']))
  def apply_visibility(self):
   tray_available=QSystemTrayIcon.isSystemTrayAvailable()
-  self.tray.setVisible(self.settings['show_menu_bar'] and tray_available)
+  self.tray.setVisible(self.settings['show_menu_bar'] and tray_available and self.shared_tray.owner)
   if self.settings['show_dock'] or not tray_available:self.showNormal()
   else:self.hide()
  def refresh_settings(self):
@@ -288,7 +381,13 @@ class Window(QMainWindow):
   if valid_wallet(self.settings['address'],self.settings['coin']):self.start()
   for coin in children:self.open_currency(coin,start_mining=True)
  def open_currency(self,coin,start_mining=False):
+  if coin not in COINS:return
   if coin==self.settings['coin']:self.show_stats();return
+  row=self.shared_tray.snapshots().get(coin)
+  if row:self.dispatch_currency(coin,'show_stats');return
+  current=profile_currency(STATE,coin)
+  if current is not None and current!=coin:
+   QMessageBox.information(self,'Currency profile is in use',profile_conflict_message(coin,current));return
   subprocess.Popen([sys.executable,str(ROOT/'app.py'),'--profile='+coin]+(['--start-mining'] if start_mining else [])+(['--offline-ui-test'] if self.offline_test else []),start_new_session=True)
  def settings_dialog(self):
   self.refresh_settings();baseline=validated(self.settings)
@@ -343,7 +442,7 @@ class Window(QMainWindow):
    label=QLabel(text);label.setAlignment(Qt.AlignmentFlag.AlignCenter);layout.addWidget(label)
   dialog.exec()
  def closeEvent(self,event):
-  if QSystemTrayIcon.isSystemTrayAvailable() and self.tray.isVisible() and not self.quitting:self.hide();event.ignore()
+  if QSystemTrayIcon.isSystemTrayAvailable() and self.settings['show_menu_bar'] and self.shared_tray.owner_available() and not self.quitting:self.hide();event.ignore()
   else:self.quit();event.accept()
  def quit(self):
   if self.quitting:return
@@ -352,13 +451,17 @@ class Window(QMainWindow):
    if not self.proc.waitForFinished(5500):
     # Never kill the supervisor before it has reaped the engine.
     self.quitting=False;self.timer.start();QMessageBox.warning(self,'Engine is still stopping','Please wait a moment, then try Quit again.');return
-  self.clock.stop();self.coordinator.close();self.sensors.close();QApplication.instance().quit()
+  self.clock.stop();self.tray.hide();self.shared_tray.close();self.coordinator.close();self.sensors.close();QApplication.instance().quit()
 
 def main():
  os.umask(0o077);STATE.mkdir(parents=True,exist_ok=True,mode=0o700)
  try:coordinator=Coordinator(STATE,PROFILE)
  except BlockingIOError:
-  atomic(STATE/(PROFILE+'.focus.json'),{'time':time.time()});return
+  if PROFILE in COINS and not focus_matches(STATE,PROFILE,PROFILE):
+   duplicate_app=QApplication(sys.argv);QMessageBox.information(None,'Currency profile is in use',profile_conflict_message(PROFILE,profile_currency(STATE,PROFILE)));return
+  data={'time':time.time()}
+  if PROFILE in COINS:data['coin']=PROFILE
+  atomic(STATE/(PROFILE+'.focus.json'),data);return
  except ValueError as e:raise SystemExit(str(e))
  app=QApplication(sys.argv);app.setApplicationName('Idle Miner');app.setDesktopFileName('idle-miner');app.setQuitOnLastWindowClosed(False)
  w=Window('--offline-ui-test' in sys.argv,coordinator=coordinator);w.apply_visibility()

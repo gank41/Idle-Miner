@@ -92,11 +92,18 @@ class Coordinator:
             atomic(self.meta,self.data);return grant
     def reserve(self,n):
         with transaction(self.tx):self.data['reserved']=n;atomic(self.meta,self.data)
-    def request_focus(self):atomic(self.state/(self.profile+'.focus.json'),{'time':time.time()})
-    def take_focus(self):
+    def request_focus(self,coin=None):
+        data={'time':time.time()}
+        if coin in COINS:data['coin']=coin
+        atomic(self.state/(self.profile+'.focus.json'),data)
+    def take_focus(self,coin=None):
         path=self.state/(self.profile+'.focus.json')
-        if path.exists():path.unlink(missing_ok=True);return True
-        return False
+        if not path.exists():return False
+        try:
+            data=json.loads(path.read_text())
+            return isinstance(data,dict) and data.get('coin') in (None,coin)
+        except (OSError,ValueError):return False
+        finally:path.unlink(missing_ok=True)
     def close(self):
         if self.closed:return
         with transaction(self.tx):self.meta.unlink(missing_ok=True);fcntl.flock(self.lock,fcntl.LOCK_UN);self.lock.close()

@@ -53,7 +53,7 @@ extension MinerApp {
   refreshLoginItem()
  }
  @objc func openLoginSettings() { loginManager.openSystemSettings() }
- func menuWillOpen(_ menu:NSMenu) { refreshSharedSettings();refreshLoginItem() }
+ func menuWillOpen(_ menu:NSMenu) { refreshSharedSettings();refreshLoginItem();if menu === unifiedMenu { sharedMenuTracking=true };updateStatistics() }
  func applicationDidBecomeActive(_ notification:Notification) { refreshLoginItem() }
 }
 

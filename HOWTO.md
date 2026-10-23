@@ -6,19 +6,19 @@ A public **Receive address** tells the provider where to send a payout. Idle Min
 
 ## Download
 
-Get the current packages from [GitHub Releases](https://github.com/gank41/Idle-Miner/releases). For version **1.7 (build 10)**, choose:
+Get the current packages from the [Idle Miner website](https://idleminer.app/#downloads). For version **1.8 (build 11)**, choose:
 
 | Computer | Download |
 | --- | --- |
-| Apple Silicon Mac, macOS 14 or later | `Idle-Miner-1.7-macOS.dmg` |
-| Supported 64-bit ARM or x86 Linux desktop | `Idle-Miner-1.7-Linux.tar.gz` |
+| Apple Silicon Mac, macOS 14 or later | `Idle-Miner-1.8-macOS.dmg` |
+| Supported 64-bit ARM or x86 Linux desktop | `Idle-Miner-1.8-Linux.tar.gz` |
 
-The Linux download is a source installer that builds the engine on your computer. It needs Python/PySide6, Qt 6, KDE Frameworks 6 development packages, and compiler dependencies from your distribution repositories. Fedora, Fedora Asahi, and recent Ubuntu/Debian-family systems are supported by the installer; older releases may lack the required packages. Native Asahi operation has not been verified. See the [release notes](docs/releases/v1.7.md) for testing details.
+The Linux download is a source installer that builds the engine on your computer. It needs Python/PySide6, Qt 6, KDE Frameworks 6 development packages, and compiler dependencies from your distribution repositories. Fedora, Fedora Asahi, and recent Ubuntu/Debian-family systems are supported by the installer; older releases may lack the required packages. Native Asahi operation has not been verified. See the [release notes](docs/releases/v1.8.md) for testing details.
 
 ## Install on a Mac
 
 1. If updating, select **Stop** and **Quit** in **every** Idle Miner currency instance before replacing the app.
-2. Open `Idle-Miner-1.7-macOS.dmg`.
+2. Open `Idle-Miner-1.8-macOS.dmg`.
 3. Drag **Idle Miner** into **Applications**. Replace the previous copy if updating.
 4. Eject the mounted disk and open **Idle Miner** from Applications.
 
@@ -29,8 +29,8 @@ This build is locally **ad-hoc signed**, and **has not been notarized by Apple**
 ## Install on Linux
 
 1. If updating, stop mining and quit **all** Idle Miner windows/profiles.
-2. Extract `Idle-Miner-1.7-Linux.tar.gz`.
-3. Open Terminal in the extracted `Idle-Miner-1.7-Linux` folder.
+2. Extract `Idle-Miner-1.8-Linux.tar.gz`.
+3. Open Terminal in the extracted `Idle-Miner-1.8-Linux` folder.
 4. Run:
 
    ```sh
@@ -102,13 +102,19 @@ Mining Stats can be resized by dragging an edge or corner. Small displays retain
 
 ## Visibility and login
 
-On Mac, Settings lets you show a Dock icon, a menu bar icon, or both. The menu bar is the default. Keep at least one visible.
+On Mac, Settings lets you show a Dock icon, a menu bar icon, or both. The menu bar is the default. Currency instances share one ₿ menu bar icon. Click it to see the colored currency rows, then hover over a currency to see its summary and controls. Choose Mining Stats in that submenu for its full window. Keep at least one visibility option enabled.
 
-On Linux, these options control the main window/taskbar and tray presence. A desktop without a usable tray keeps the main window accessible. Closing hides the window only when a usable visible tray remains; otherwise it quits and stops mining. GNOME tray support depends on the desktop setup.
+On Linux, these options control the main window/taskbar and tray presence. Currency instances share one tray icon with controls for each currency. A desktop without a usable tray keeps the main window accessible. Closing hides the window only when a usable visible tray remains; otherwise it quits and stops mining. GNOME tray support depends on the desktop setup.
 
 **Start at Login** alone opens the default instance stopped. Directly beneath it, **Start at Login and Start Mining configured currencies** is a separate opt-in checkbox, off by default. When both are enabled, an actual login launch opens a profile and starts automatic mining for each valid saved BTC, LTC, DOGE, and ETH address. Currencies without a saved address are skipped. Invalid or unreadable settings require attention before automatic startup. It does not create wallets or copy an address into another currency.
 
 All started profiles share your configured CPU limit and retain the usual safety checks. Each active engine can require its own roughly 2 GB dataset, so enabling several currencies increases memory, electricity, and heat use after login. Manual app openings remain stopped. Turning off **Start at Login** clears and disables the mining checkbox. You can still select **Start Mining** explicitly whenever ready.
+
+## Check for updates
+
+Choose **Check for Updates…** from the app menu. Idle Miner checks the version information at `https://idleminer.app/updates/stable.json` only when you request it. If a newer release is available, you can read its release notes and download the installer for your platform. The update check and download do not send your wallet addresses.
+
+The app does not replace itself or install an update automatically. Stop mining and quit every currency instance, then install the downloaded package using the Mac or Linux steps above. Your saved wallets and settings remain in your user account. You can also download the current release from [idleminer.app](https://idleminer.app/#downloads).
 
 ## Keep or remove your settings
 

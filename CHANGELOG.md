@@ -1,5 +1,13 @@
 # Changes
 
+## 1.8 — build 11
+
+The website, installers, corresponding source downloads, and update information now live at [idleminer.app](https://idleminer.app/) on Cloudflare Pages. The GitHub repository remains available for source and issues.
+
+Currency instances now share one menu bar icon on Mac and one tray icon on Linux and a manual **Check for Updates…** command. A check offers release notes and the matching installer; users install updates themselves after quitting every currency instance. Wallet addresses and mining settings are not included in update requests.
+
+See the [release notes](docs/releases/v1.8.md) for downloads and verification limits.
+
 ## 1.7 — build 10
 
 Added Ethereum (ETH) payout addresses, mixed-case EIP-55 checksum validation, ETH reporting and currency profiles. Mining remains CPU RandomX through unMineable; Ethereum is not mined directly. Confirm the provider payout network matches the receiving wallet's ETH network.

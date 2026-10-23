@@ -6,7 +6,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def get(url):
  if urllib.parse.urlsplit(url).hostname not in ('api.coinbase.com','api.unmineable.com') or not url.startswith('https://'):raise ValueError('Unexpected API URL')
- req=urllib.request.Request(url,headers={'User-Agent':'IdleMinerLinux/1.7'})
+ req=urllib.request.Request(url,headers={'User-Agent':'IdleMinerLinux/1.8'})
  with urllib.request.build_opener(NoRedirect).open(req,timeout=12) as r:
   raw=r.read(2_000_001)
   if len(raw)>2_000_000:raise ValueError('Response too large')

@@ -16,12 +16,15 @@
 !/Linux/
 !/docs/
 !/tools/
+!/Deployment/
 # Keep internal project plans and relocation records local.
 /docs/*
 !/docs/index.html
 !/docs/site.css
 !/docs/site.js
 !/docs/.nojekyll
+!/docs/_headers
+!/docs/_redirects
 !/docs/assets/
 !/docs/releases/
 # No user state, audit receipts, backups, installers, or build outputs.
@@ -38,3 +41,5 @@ settings.json
 *.p12
 *.p8
 *.pem
+**/node_modules/
+.wrangler/

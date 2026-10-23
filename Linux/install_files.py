@@ -13,7 +13,7 @@ for name in ('app.lock','BTC.lock','LTC.lock','DOGE.lock','ETH.lock','default.en
  locks.append(lock)
 root=home/'.local/share/idle-miner';root.mkdir(parents=True,exist_ok=True)
 build=Path(os.environ['IDLE_MINER_BUILD'])
-for name in ('app.py','core.py','coordination.py','startup.py','platform_linux.py','network.py','icon.png','README.txt','LICENSE.txt'):
+for name in ('app.py','core.py','coordination.py','shared_tray.py','updates.py','startup.py','platform_linux.py','network.py','icon.png','README.txt','LICENSE.txt'):
  shutil.copy2(name,root/name)
 for source,name in ((build/'xmrig-build/xmrig','xmrig'),(build/'idle-build/idle-monitor','idle-monitor'),(build/'miner-supervisor','miner-supervisor')):
  shutil.copy2(source,root/name);(root/name).chmod(0o755)

@@ -16,7 +16,7 @@ extension MinerApp {
   do { return try coordinator?.quota(requested:request,actual:engine.reservedThreads,budget:settings.idleThreads,cores:cores) ?? request }
   catch { enabled=false;benchmarkDeadline=nil;pendingRestart=false;fatalError=error.localizedDescription;engine.stop();sessionClock.stop();return 0 }
  }
- @objc func showProfile(_ notification:Notification) { showStatistics() }
+ @objc func showProfile(_ notification:Notification) { if notification.userInfo?["view"] as? String == "settings" { showSettings() } else { showStatistics() } }
  @objc func switchCurrency(_ sender:NSMenuItem) {
   guard let coin=sender.representedObject as? String,coin != settings.coin else { return }
   refreshSharedSettings()
@@ -38,18 +38,29 @@ extension MinerApp {
   guard let coin=sender.representedObject as? String else { return }
   openCurrencyInstance(coin,startMining:false,showStats:true)
  }
- func openCurrencyInstance(_ coin:String,startMining:Bool,showStats:Bool) {
+ func openCurrencyInstance(_ coin:String,startMining:Bool,showStats:Bool,showSettings:Bool=false,boostMinutes:Int?=nil) {
   guard Settings.coins.contains(coin) else { return }
-  if settings.coin==coin { if showStats { showStatistics() };return }
-  if let pid=ProfileCoordinator.existingPID(base:baseFolder,profile:coin) {
-   if showStats {
-    DistributedNotificationCenter.default().postNotificationName(Notification.Name("local.jeff.idleminer.showProfile"),object:coin,userInfo:nil,deliverImmediately:true)
-    NSRunningApplication(processIdentifier:pid)?.activate(options:[])
-   };return
+  if settings.coin==coin {
+   if boostMinutes != nil { performCurrencyCommand("boost",minutes:boostMinutes) }
+   else if startMining { self.startMining() }
+   if showSettings { self.showSettings() } else if showStats { showStatistics() };return
+  }
+  // A profile is a stable process slot, not proof of its current payout currency.
+  if sharedMenuStore==nil { sharedMenuStore=try? SharedMenuStore(base:baseFolder,profile:profileName) }
+  if let peer=sharedMenuStore?.snapshots().filter({$0.coin==coin}).max(by:{$0.rank<$1.rank}) {
+   do {
+    if let minutes=boostMinutes { try sharedMenuStore?.send(peer,action:"boost",minutes:minutes) }
+    else if startMining { try sharedMenuStore?.send(peer,action:"start") }
+    if showStats || showSettings { try sharedMenuStore?.send(peer,action:showSettings ? "settings":"stats") }
+   } catch { alert(error.localizedDescription) };return
+  }
+  let candidates=[coin]+(["default"]+Settings.coins).filter{$0 != coin}
+  guard let slot=candidates.first(where:{$0 != profileName && ProfileCoordinator.existingPID(base:baseFolder,profile:$0)==nil}) else {
+   alert("All currency process slots are occupied. Close an unused currency instance, then open \(coin) again.");return
   }
   let configuration=NSWorkspace.OpenConfiguration();configuration.createsNewApplicationInstance=true
-  configuration.arguments=["--profile=\(coin)"]+(startMining ? ["--start-mining"] : [])+(showStats ? ["--show-stats"] : [])
-  configuration.activates=showStats
+  configuration.arguments=["--profile=\(slot)"]+(slot==coin ? [] : ["--currency=\(coin)"])+(boostMinutes.map{TimedBoost.durations.contains($0) ? ["--boost-minutes=\($0)"] : []} ?? (startMining ? ["--start-mining"] : []))+(showStats ? ["--show-stats"] : [])+(showSettings ? ["--show-settings"] : [])
+  configuration.activates=showStats || showSettings
   if let handler=profileLaunchHandler { handler(coin,configuration.arguments);return }
   NSWorkspace.shared.openApplication(at:Bundle.main.bundleURL,configuration:configuration) { _,error in
    if let error=error { DispatchQueue.main.async { self.alert("Could not open another instance. \(error.localizedDescription)") } }
@@ -57,7 +68,7 @@ extension MinerApp {
  }
  func applyVisibility() {
   NSApp.setActivationPolicy(settings.showDock ? .regular : .accessory)
-  statusItem?.isVisible=settings.showMenuBar
+  if !settings.showMenuBar { statusItem?.isVisible=false;sharedMenuStore?.releaseOwnership() }
   dockItem?.state=settings.showDock ? .on : .off;menuBarItem?.state=settings.showMenuBar ? .on : .off
   dockCheck.state=settings.showDock ? .on : .off;menuBarCheck.state=settings.showMenuBar ? .on : .off
  }
@@ -66,7 +77,7 @@ extension MinerApp {
   var next=settings;next.showDock=dock;next.showMenuBar=menu
   do {
    try next.save(to:settingsURL,walletChanges:[:],updateDefaultCoin:false)
-   lastSettingsData=nil;refreshSharedSettings();applyVisibility()
+   lastSettingsData=nil;refreshSharedSettings();applyVisibility();updateStatistics()
   } catch { alert(error.localizedDescription) }
  }
  @objc func toggleDock() { saveVisibility(dock:!settings.showDock,menu:settings.showMenuBar) }

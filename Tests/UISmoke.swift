@@ -18,6 +18,7 @@ class SmokeApp:MinerApp {
  override func applicationDidFinishLaunching(_ n:Notification) {
   loginManager=FakeLoginItem()
   super.applicationDidFinishLaunching(n)
+  precondition(self.statusItem.menu?.items.first?.title.contains("LTC")==true,"Shared menu must begin with a currency submenu, not the old top-level summary")
   showSettings()
   let login=loginManager as! FakeLoginItem
   precondition(loginItem.state == .off && loginCheck.state == .off && !loginMiningCheck.isEnabled && loginMiningCheck.state == .off,"Login mining must default off and require parent login")
@@ -34,6 +35,7 @@ class SmokeApp:MinerApp {
   toggleLoginItem(); precondition(login.status == .notRegistered,"Cancel pending request")
   login.status = .enabled; menuWillOpen(statusItem.menu!)
   precondition(loginCheck.state == .on && loginItem.state == .on,"External changes must refresh")
+  menuDidClose(statusItem.menu!)
   login.status = .notRegistered; refreshLoginItem()
   login.fail=true; toggleLoginItem()
   precondition(loginItem.state == .off && loginCheck.state == .off && lastAlert?.contains("Test registration failure")==true,"Failed registration must restore controls and report failure")
@@ -90,7 +92,7 @@ class SmokeApp:MinerApp {
    self.statsService.poolError="Test unavailable"; self.updateStatistics()
    precondition(color()==NSColor.systemGray && stats.balance.stringValue.contains("Last known"),"Stale earnings not labeled")
    self.menuSummary.update(["Boost mining · 8 threads · 0:14:59 left", "Mining is working · fresh hashrate and pool connection", "RandomX: 519.4 H/s → LTC", "Pool-accepted shares this session: 128", "1 LTC ≈ $67.34 USD", "Pool balance: 0.00014792 LTC"])
-   precondition(self.statusItem.menu?.items.first?.view === self.menuSummary)
+   precondition(self.profileMenu.items.first?.view === self.menuSummary)
    for theme in [NSAppearance.Name.aqua, .darkAqua] {
     self.menuSummary.appearance=NSAppearance(named:theme)
     let panel=NSWindow(contentRect:self.menuSummary.bounds,styleMask:[.borderless],backing:.buffered,defer:false)
@@ -109,7 +111,7 @@ class SmokeApp:MinerApp {
     }
     self.menuSummary.removeFromSuperview(); panel.orderOut(nil)
    }
-   self.statusItem.menu?.items.first?.view=self.menuSummary
+   self.profileMenu.items.first?.view=self.menuSummary
    self.menuSummary.appearance=nil
    self.showAbout()
    guard let about=self.aboutWindow, let stack=about.contentView?.subviews.first as? NSStackView else { Swift.fatalError("Missing custom About") }

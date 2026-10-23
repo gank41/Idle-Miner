@@ -13,6 +13,14 @@ import AppKit
  var ignoreEngineOutput=false
  var lastSettingsData:Data?
  var lastIconText=""
+ var sharedMenuStore:SharedMenuStore?
+ var profileMenu:NSMenu!
+ var unifiedMenu:NSMenu?
+ var sharedCurrencyRows=[String:NSMenuItem]()
+ var sharedRemoteSummaries=[String:MenuSummary]()
+ var rootLoginItem:NSMenuItem?
+ var sharedMenuSignature=""
+ var sharedMenuTracking=false
  var currencyMenus=[NSMenu]()
  var profileLaunchHandler:((String,[String])->Void)?
  let dockCheck=NSButton(checkboxWithTitle:"Show Dock icon",target:nil,action:nil)
@@ -49,6 +57,8 @@ import AppKit
  var localStats=LocalMiningStats()
  var lastHealthLevel:MiningHealth.Level?
  let statsService=StatsService()
+ let updateService=UpdateService()
+ var updateCheckTask:Task<Void,Never>?
  var statsWindow:StatsWindow?
  var engineResources:URL { Bundle.main.resourceURL! }
  var statisticsNetworkingEnabled:Bool { Bundle.main.bundleIdentifier=="local.jeff.idleminer" }
@@ -74,11 +84,24 @@ import AppKit
   do { coordinator=try ProfileCoordinator(base:baseFolder,profile:profileName) }
   catch {
    if ProfileCoordinator.existingPID(base:baseFolder,profile:profileName)==nil { alert(error.localizedDescription) }
+   let override=CommandLine.arguments.first(where:{$0.hasPrefix("--currency=")}).map{String($0.dropFirst("--currency=".count))}
+   let requested=override.flatMap{Settings.coins.contains($0) ? $0:nil} ?? (profileName=="default" ? nil:profileName)
+   if let requested {
+    let current=(try? SharedMenuStore(base:baseFolder,profile:profileName))?.snapshots().first{$0.profile==profileName}
+    guard current?.coin==requested else {
+     alert("This process slot is already open with a different currency or its status is unavailable. Open \(requested) from Idle Miner’s shared menu instead.")
+     NSApp.terminate(nil);return
+    }
+   }
    DistributedNotificationCenter.default().postNotificationName(Notification.Name("local.jeff.idleminer.showProfile"),object:profileName,userInfo:nil,deliverImmediately:true)
    NSApp.terminate(nil);return
   }
   do { settings=try Settings.load(from:settingsURL);lastSettingsData=try? Data(contentsOf:settingsURL) } catch { fatalError=error.localizedDescription }
   if profileName != "default" { settings.switchCoin(to:profileName) }
+  if let argument=CommandLine.arguments.first(where:{$0.hasPrefix("--currency=")}) {
+   let coin=String(argument.dropFirst("--currency=".count))
+   if Settings.coins.contains(coin) { settings.switchCoin(to:coin) }
+  }
   let loginCurrencies=StartupPlan.currencies(settings,loginLaunch:loginLaunch,loginEnabled:loginManager.status == .enabled,profile:profileName)
   if let first=loginCurrencies.first { settings.switchCoin(to:first) }
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(showProfile(_:)),name:Notification.Name("local.jeff.idleminer.showProfile"),object:profileName)
@@ -126,6 +149,7 @@ import AppKit
   for (title,sel,key) in [("Undo",Selector(("undo:")),"z"),("Cut",#selector(NSText.cut(_:)),"x"),("Copy",#selector(NSText.copy(_:)),"c"),("Paste",#selector(NSText.paste(_:)),"v"),("Select All",#selector(NSText.selectAll(_:)),"a")] { edit.addItem(NSMenuItem(title:title,action:sel,keyEquivalent:key)) }
   main.addItem(editItem); NSApp.mainMenu=main
   statusItem=NSStatusBar.system.statusItem(withLength:NSStatusItem.variableLength)
+  statusItem.isVisible=false
   statusItem.button?.title="₿"; statusItem.button?.toolTip="Idle Miner"
   let menu=NSMenu(); menu.autoenablesItems=false; menu.delegate=self
   let summaryItem=NSMenuItem(); summaryItem.view=menuSummary; menu.addItem(summaryItem)
@@ -155,7 +179,8 @@ import AppKit
   _=add("Show Latest Log",#selector(showLog),to:menu)
   _=add("Wallet & Payout Help",#selector(showHelp),to:menu)
   _=add("About Idle Miner",#selector(showAbout),to:menu)
-  menu.addItem(.separator()); _=add("Quit Idle Miner",#selector(quitApp),key:"q",to:menu)
+  menu.addItem(.separator()); _=add("Quit This Currency",#selector(quitApp),key:"q",to:menu)
+  profileMenu=menu
   statusItem.menu=menu
   let appMenu=NSMenu(title:"Idle Miner");appMenu.autoenablesItems=false
   _=add("Mining Stats…",#selector(showStatistics),to:appMenu)
@@ -202,6 +227,8 @@ import AppKit
  }
  func tick() {
   guard engine != nil else { return }
+  drainSharedMenuCommands()
+  guard !quitting else { return }
   refreshSharedSettings()
   sessionClock.sample(hashing:engine.ready && !engine.isStopping && !engine.isChanging && (localStats.currentRate() ?? 0)>0)
   if statisticsNetworkingEnabled { statsService.refresh(coin:settings.coin,address:settings.address) }
@@ -298,8 +325,8 @@ import AppKit
     if secondary { field.textColor = .secondaryLabelColor }
     stack.addArrangedSubview(field); field.widthAnchor.constraint(equalTo:stack.widthAnchor).isActive=true
    }
-   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.7"
-   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "10"
+   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.8"
+   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "11"
    centered("Idle Miner",size:24,bold:true)
    centered("By Jeffry Zander",size:14)
    centered("Version \(version) (\(build))",secondary:true)
@@ -312,6 +339,7 @@ import AppKit
  }
  @objc func quitApp() { NSApp.terminate(nil) }
  func applicationShouldTerminate(_ sender:NSApplication)->NSApplication.TerminateReply {
+  quitting=true;statusItem?.isVisible=false;sharedMenuStore?.releaseOwnership()
   enabled=false; boost=nil; benchmarkDeadline=nil; timer?.invalidate()
   if engine?.running == true { quitting=true; engine.stop(); return .terminateLater }
   return .terminateNow

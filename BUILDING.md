@@ -52,14 +52,22 @@ See [Linux README](Linux/README.txt) for prerequisites and installed paths.
 
 ## Release packages
 
-Prebuilt Mac disk images and Linux source installers are published as GitHub
-Release assets, rather than stored in Git history. Each release includes SHA-256
+Prebuilt Mac disk images, Linux source installers, and corresponding source
+snapshots are hosted at [idleminer.app](https://idleminer.app/#downloads) on
+Cloudflare Pages, outside Git history. The GitHub repository remains the public
+source and issue tracker. Each release includes SHA-256
 checksums and a corresponding source snapshot. The source snapshot must include
 the same native/Python controller, supervisor, resources and pinned upstream
 engine source as the downloadable release. Public packages must contain no wallets,
 settings, logs, account balances, developer credentials or private audit records.
 
-Version 1.7 (build 10) adds ETH address/checksum and profile coverage, plus explicit
-login-mining consent and launch-origin checks. Record fresh results in
-[the 1.7 release notes](docs/releases/v1.7.md); earlier release checks do not
+Version 1.8 (build 11) adds one shared menu bar/tray icon, a manual **Check for Updates…**
+command, and Cloudflare-hosted releases. Record fresh results in
+[the 1.8 release notes](docs/releases/v1.8.md); earlier release checks do not
 establish coverage for the new build. Native Asahi hardware remains untested.
+
+## Website deployment
+
+See [Deployment/README.md](Deployment/README.md) for the static site build, release
+manifest checks, and direct upload to Cloudflare Pages. Deployment credentials and
+release binaries are kept outside the public source tree.

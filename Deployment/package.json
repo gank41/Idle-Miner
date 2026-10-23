@@ -1,0 +1,7 @@
+{
+  "name": "idle-miner-site",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build-site.mjs" },
+  "dependencies": { "marked": "17.0.5" }
+}

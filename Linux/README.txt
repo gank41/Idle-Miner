@@ -1,4 +1,4 @@
-IDLE MINER 1.6.1 (BUILD 9) FOR LINUX
+IDLE MINER 1.7 (BUILD 10) FOR LINUX
 By Jeffry Zander
 
 INSTALL
@@ -12,12 +12,16 @@ several minutes. Open Idle Miner from your application launcher.
 Qt 6 / PySide6 and KDE Frameworks 6 development packages must be available
 in your distribution repositories. Ubuntu 26.04 ARM64 dependency names
 were checked on an actual guest. Older releases may lack these packages.
-Mining never starts merely by installing, launching or Start at Login.
+Installing and manual launches open stopped. Start at Login also opens
+stopped unless you explicitly enable the separate login mining option.
 
 SETTINGS
-Save public RECEIVE addresses for BTC, LTC and DOGE together. Use each
+Save public RECEIVE addresses for BTC, LTC, DOGE and ETH together. Use each
 currency's native network. Never enter a seed phrase, private key or
-password. Existing saved currency/address settings are retained.
+password. ETH payouts use Ethereum (ETH): select that same network at
+unMineable and in your wallet. A 0x address cannot identify its network.
+ETH addresses accept uniform case or a valid mixed-case EIP-55 checksum;
+zero addresses and payment URIs are rejected. Existing wallets are retained.
 Switch Currency stops/reaps the engine and resets the displayed stats.
 A running session resumes with the saved target address, or opens Settings
 if no target address is saved. Open Another Currency launches another
@@ -56,7 +60,17 @@ only when a visible usable tray exists; otherwise closing quits and stops
 mining. The tray symbol is green for fresh work, red for an engine,
 connection or reporting issue, gray for stopped/paused/starting. GNOME may
 need a tray extension; the regular window works without one.
-Start at Login launches the default profile stopped. The offline test uses
+Start at Login launches the default profile stopped by default. Directly
+below it, "Start at Login and Start Mining configured currencies" is an
+optional, initially OFF checkbox. It is enabled only while Start at Login
+is enabled. Both controls take effect immediately; turning Start at Login
+off also clears this opt-in. With both enabled, an actual login launch
+starts one miner per currency with a valid saved wallet (BTC/LTC/DOGE/ETH).
+Currencies with blank wallets are skipped, without opening Settings. All
+miners keep the same shared CPU and memory rules. Manual application
+launches stay stopped. Reinstall updates an existing autostart entry and
+preserves its enabled/disabled state; it does not enable autostart.
+The offline test uses
 one thread for up to 70 seconds, connects to no pool and earns nothing.
 
 LINUX / ASAHI / VM NOTES

@@ -21,3 +21,10 @@ IDLE_MINER_STATE=$(mktemp -d /private/tmp/miner-ui.XXXXXX) /private/tmp/MinerUIS
 
 /usr/bin/swiftc -parse-as-library -module-cache-path /private/tmp/miner-swift-cache -framework AppKit -framework IOKit "${common[@]}" "$root/Sources/Runtime.swift" "$root/Sources/App.swift" "$root/Sources/LoginItem.swift" "$root/Sources/MiningStats.swift" "$root/Sources/StatsService.swift" "$root/Sources/StatsWindow.swift" "$root/Sources/StatsPresentation.swift" "$root/Sources/MenuSummary.swift" "$root/Sources/ProfilePresentation.swift" "$root/Tests/MultiInstanceIntegration.swift" -o /private/tmp/miner-multi-tests
 /private/tmp/miner-multi-tests "$root/Idle Miner.app/Contents/Resources"
+
+/usr/bin/swiftc -parse-as-library -module-cache-path /private/tmp/miner-swift-cache "${common[@]}" "$root/Tests/EthereumStartupTests.swift" -o /private/tmp/miner-eth-tests
+/private/tmp/miner-eth-tests
+
+/usr/bin/swiftc -parse-as-library -module-cache-path /private/tmp/miner-swift-cache -framework AppKit -framework IOKit "${common[@]}" "$root/Sources/Runtime.swift" "$root/Sources/App.swift" "$root/Sources/LoginItem.swift" "$root/Sources/MiningStats.swift" "$root/Sources/StatsService.swift" "$root/Sources/StatsWindow.swift" "$root/Sources/StatsPresentation.swift" "$root/Sources/MenuSummary.swift" "$root/Sources/ProfilePresentation.swift" "$root/Tests/LoginStartupIntegration.swift" -o /private/tmp/miner-login-tests
+IDLE_MINER_STATE=$(mktemp -d /private/tmp/miner-login.XXXXXX) /private/tmp/miner-login-tests
+IDLE_MINER_STATE=$(mktemp -d /private/tmp/miner-manual.XXXXXX) /private/tmp/miner-login-tests --manual

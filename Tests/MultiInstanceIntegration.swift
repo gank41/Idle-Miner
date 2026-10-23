@@ -42,7 +42,7 @@ import Darwin
   defer { try? FileManager.default.removeItem(at:folder) }
   let resources=CommandLine.arguments.last!
   var processes=[String:Process]();var outputs=[String]();var lineBuffers=[String:LineBuffer]()
-  for profile in ["default","DOGE"] {
+  for profile in ["default","ETH"] {
    let process=Process();let pipe=Pipe()
    process.executableURL=URL(fileURLWithPath:CommandLine.arguments[0]);process.arguments=["--worker","--profile=\(profile)",resources]
    var env=ProcessInfo.processInfo.environment;env["IDLE_MINER_STATE"]=folder.path;process.environment=env
@@ -68,12 +68,12 @@ import Darwin
   }
   try wait{outputs.filter{$0.contains(":BOOT")}.count==2}
   try Data().write(to:folder.appendingPathComponent("go"))
-  try wait{["default","DOGE"].allSatisfy{p in outputs.contains{$0.hasPrefix(p+":") && $0.contains("READY threads 1/1 ")}}}
+  try wait{["default","ETH"].allSatisfy{p in outputs.contains{$0.hasPrefix(p+":") && $0.contains("READY threads 1/1 ")}}}
   let records=(try FileManager.default.contentsOfDirectory(at:folder.appendingPathComponent("Coordination"),includingPropertiesForKeys:nil)).filter{$0.pathExtension=="json"}
   let reserved=try records.reduce(0){sum,url in sum+((try JSONSerialization.jsonObject(with:Data(contentsOf:url)) as! [String:Any])["reserved"] as! Int)}
   precondition(reserved<=2,"Combined reservations exceeded configured two-thread budget")
-  try Data().write(to:folder.appendingPathComponent("stop-DOGE"))
-  try wait{!processes["DOGE"]!.isRunning}
+  try Data().write(to:folder.appendingPathComponent("stop-ETH"))
+  try wait{!processes["ETH"]!.isRunning}
   try wait{outputs.contains{$0.hasPrefix("default:") && $0.contains("READY threads 2/2 ")}}
   // Simulate controller death. Supervisor's engine lease must keep capacity
   // occupied until its own process group is stopped/reaped.

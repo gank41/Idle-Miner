@@ -14,11 +14,12 @@ import AppKit
  var lastSettingsData:Data?
  var lastIconText=""
  var currencyMenus=[NSMenu]()
+ var profileLaunchHandler:((String,[String])->Void)?
  let dockCheck=NSButton(checkboxWithTitle:"Show Dock icon",target:nil,action:nil)
  let menuBarCheck=NSButton(checkboxWithTitle:"Show menu bar icon",target:nil,action:nil)
  var dockItem:NSMenuItem!
  var menuBarItem:NSMenuItem!
- lazy var walletFields:[String:NSTextField]=["LTC":walletField,"DOGE":NSTextField(),"BTC":NSTextField()]
+ lazy var walletFields:[String:NSTextField]=["LTC":walletField,"DOGE":NSTextField(),"BTC":NSTextField(),"ETH":NSTextField()]
  var editingWallets=[String:String]()
  var settings=Settings()
  var sensors=Sensors()
@@ -58,6 +59,7 @@ import AppKit
  var loginItem:NSMenuItem!
  var loginApprovalItem:NSMenuItem!
  let loginCheck=NSButton(checkboxWithTitle:"Start at Login",target:nil,action:nil)
+ let loginMiningCheck=NSButton(checkboxWithTitle:"Start at Login and Start Mining configured currencies",target:nil,action:nil)
  let loginHint=NSTextField(wrappingLabelWithString:"")
  let loginApprovalButton=NSButton(title:"Open Login Items…",target:nil,action:nil)
  let coinField=NSPopUpButton()
@@ -68,6 +70,7 @@ import AppKit
  let formError=NSTextField(wrappingLabelWithString:"")
  var settingsURL:URL { baseFolder.appendingPathComponent("settings.json") }
  func applicationDidFinishLaunching(_ notification:Notification) {
+  let loginLaunch=loginManager.launchedAtLogin
   do { coordinator=try ProfileCoordinator(base:baseFolder,profile:profileName) }
   catch {
    if ProfileCoordinator.existingPID(base:baseFolder,profile:profileName)==nil { alert(error.localizedDescription) }
@@ -76,6 +79,8 @@ import AppKit
   }
   do { settings=try Settings.load(from:settingsURL);lastSettingsData=try? Data(contentsOf:settingsURL) } catch { fatalError=error.localizedDescription }
   if profileName != "default" { settings.switchCoin(to:profileName) }
+  let loginCurrencies=StartupPlan.currencies(settings,loginLaunch:loginLaunch,loginEnabled:loginManager.status == .enabled,profile:profileName)
+  if let first=loginCurrencies.first { settings.switchCoin(to:first) }
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(showProfile(_:)),name:Notification.Name("local.jeff.idleminer.showProfile"),object:profileName)
   engine=Engine(resources:engineResources,folder:folder.appendingPathComponent("Logs",isDirectory:true))
   engine.leaseURL=coordinator?.engineLeaseURL
@@ -112,6 +117,7 @@ import AppKit
      let minutes=Int(argument.dropFirst("--boost-minutes=".count)), TimedBoost.durations.contains(minutes) {
    beginBoost(minutes:minutes)
   } else if CommandLine.arguments.contains("--start-mining") { startMining() }
+  else if !loginCurrencies.isEmpty { startConfiguredCurrenciesAtLogin(loginCurrencies) }
   if CommandLine.arguments.contains("--show-stats") { showStatistics() }
   if CommandLine.arguments.contains("--show-settings") { showSettings() }
  }
@@ -292,8 +298,8 @@ import AppKit
     if secondary { field.textColor = .secondaryLabelColor }
     stack.addArrangedSubview(field); field.widthAnchor.constraint(equalTo:stack.widthAnchor).isActive=true
    }
-   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.6.1"
-   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "9"
+   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.7"
+   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "10"
    centered("Idle Miner",size:24,bold:true)
    centered("By Jeffry Zander",size:14)
    centered("Version \(version) (\(build))",secondary:true)
@@ -349,6 +355,7 @@ import AppKit
   for n in [2,4,8,12] { threadsField.addItem(withTitle:"\(n) threads");threadsField.lastItem!.tag=n };row(threadsField)
   row(activeCheck);row(dockCheck);row(menuBarCheck)
   loginCheck.allowsMixedState=true;loginCheck.target=self;loginCheck.action=#selector(toggleLoginItem);row(loginCheck)
+  loginMiningCheck.target=self;loginMiningCheck.action=#selector(toggleLoginMining);row(loginMiningCheck)
   loginHint.font = .systemFont(ofSize:12);loginHint.textColor = .secondaryLabelColor;row(loginHint)
   loginApprovalButton.target=self;loginApprovalButton.action=#selector(openLoginSettings);loginApprovalButton.isHidden=true;stack.addArrangedSubview(loginApprovalButton)
   row(label("Each currency uses a separate mining dataset (about 2 GB). Running instances share the total thread limit and reserve two CPU cores where possible. Active-use, battery, sleep, heat and memory protections still apply. Keep a Dock or menu bar icon enabled."))
@@ -362,6 +369,7 @@ import AppKit
   let coin=coinField.titleOfSelectedItem ?? "LTC"
   if coin=="LTC" { guidance.stringValue="Recommended: Robinhood → Litecoin → Receive. Use the Litecoin network (L…, M…, or ltc1q…). Never paste your Bitcoin address here." }
   else if coin=="BTC" { guidance.stringValue="Robinhood → Bitcoin → Receive. Native Bitcoin only (1…, 3…, or bc1q…). BTC has a high provider payout minimum; no Lightning or Taproot." }
+  else if coin=="ETH" { guidance.stringValue="Ethereum public Receive address (0x…); mixed-case addresses must pass ERC-55. Choose Ethereum (ETH) in both your wallet and provider payout settings. A 0x address alone cannot identify the network. CPU work is converted to ETH; Ethereum itself is not mined." }
   else { guidance.stringValue="Robinhood → Dogecoin → Receive. Use the native Dogecoin network and a D… address. Check the provider’s payout minimum." }
  }
  @objc func saveSettings() {

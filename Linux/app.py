@@ -7,6 +7,7 @@ from PySide6.QtGui import QIcon,QPixmap,QPainter,QPen,QColor,QFont,QDesktopServi
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QMenu,QSystemTrayIcon,QDialog,QFormLayout,QLineEdit,QComboBox,QCheckBox,QDialogButtonBox,QMessageBox,QPlainTextEdit,QTabWidget,QWidgetAction,QScrollArea)
 from core import VERSION,BUILD,DEFAULTS,COINS,DURATIONS,Work,SessionClock,duration,now,validated,valid_wallet,threads,config
 from coordination import SettingsStore,Coordinator,atomic
+from startup import startup_plan,autostart_enabled,login_entry,save_login_preference
 from platform_linux import Sensors
 from network import Network
 ROOT=Path(__file__).resolve().parent
@@ -81,8 +82,8 @@ class Window(QMainWindow):
   boost=menu.addMenu('Boost Mining')
   for minutes in DURATIONS:boost.addAction(f'{minutes} Min' if minutes<60 else f'{minutes//60} Hour'+('s' if minutes>60 else ''),lambda m=minutes:self.boost(m))
   menu.addAction('End Boost · Return to Automatic',self.end_boost);menu.addAction('Settings…',self.settings_dialog)
-  login=menu.addAction('Start at Login');login.setCheckable(True);login.setChecked(AUTOSTART.exists());login.triggered.connect(self.set_login)
-  menu.aboutToShow.connect(lambda:login.setChecked(AUTOSTART.exists()))
+  login=menu.addAction('Start at Login');login.setCheckable(True);login.setChecked(autostart_enabled(AUTOSTART));login.triggered.connect(self.set_login)
+  menu.aboutToShow.connect(lambda:login.setChecked(autostart_enabled(AUTOSTART)))
   currencies=menu.addMenu('Switch Currency')
   another=menu.addMenu('Open Another Currency')
   for coin in COINS:
@@ -278,9 +279,17 @@ class Window(QMainWindow):
   self.work=Work();self.graph.work=self.work;launched=self.clock.launched;self.clock=SessionClock();self.clock.launched=launched;self.reset_reporting();self.setWindowTitle('Idle Miner · '+coin)
   if resume and valid_wallet(self.settings['address'],coin):self.start()
   elif resume:QTimer.singleShot(0,self.settings_dialog)
- def open_currency(self,coin):
+ def apply_startup(self,args):
+  self.refresh_settings()
+  selected,children=startup_plan(self.settings,self.profile,args,autostart_enabled(AUTOSTART))
+  if selected is None:return
+  if selected!=self.settings['coin']:self.switch_currency(selected)
+  # A missing/changed wallet at login must never open Settings or start mining.
+  if valid_wallet(self.settings['address'],self.settings['coin']):self.start()
+  for coin in children:self.open_currency(coin,start_mining=True)
+ def open_currency(self,coin,start_mining=False):
   if coin==self.settings['coin']:self.show_stats();return
-  subprocess.Popen([sys.executable,str(ROOT/'app.py'),'--profile='+coin]+(['--offline-ui-test'] if self.offline_test else []),start_new_session=True)
+  subprocess.Popen([sys.executable,str(ROOT/'app.py'),'--profile='+coin]+(['--start-mining'] if start_mining else [])+(['--offline-ui-test'] if self.offline_test else []),start_new_session=True)
  def settings_dialog(self):
   self.refresh_settings();baseline=validated(self.settings)
   dialog=QDialog(self);dialog.setWindowTitle('Idle Miner Settings');dialog.setMinimumWidth(540);form=QFormLayout(dialog)
@@ -292,9 +301,17 @@ class Window(QMainWindow):
   stats=QCheckBox('Read earnings from unMineable using my public receive address');stats.setChecked(self.settings['pool_stats'])
   dock=QCheckBox('Show window / taskbar');dock.setChecked(self.settings['show_dock'])
   tray=QCheckBox('Show tray / menu bar');tray.setChecked(self.settings['show_menu_bar'])
-  login=QCheckBox('Start at Login');login.setChecked(AUTOSTART.exists());login.clicked.connect(self.set_login)
-  for label,widget in [('Shared maximum idle / boost threads',count),('',pause),('',stats),('',dock),('',tray),('',login)]:form.addRow(label,widget)
-  note=QLabel('Save each currency’s public Receive address on its native network. No password, seed phrase or private key is needed.\n\nUse Switch Currency or Open Another Currency from the menu. All running currencies share this thread budget and reserve two CPU cores where possible. Each needs about 3 GB free memory to start.\n\nKeep at least one visibility option selected. Desktops without a usable tray always keep a window visible. Start at Login opens stopped; that checkbox takes effect immediately. Saving settings stops this session.');note.setWordWrap(True);form.addRow(note)
+  login=QCheckBox('Start at Login');login.setChecked(autostart_enabled(AUTOSTART))
+  mine=QCheckBox('Start at Login and Start Mining configured currencies');mine.setChecked(login.isChecked() and baseline['start_mining_at_login']);mine.setEnabled(login.isChecked())
+  def toggle_login(enabled):
+   self.set_login(enabled);login.setChecked(autostart_enabled(AUTOSTART));mine.setEnabled(login.isChecked())
+   mine.setChecked(login.isChecked() and self.store.load()['start_mining_at_login'])
+  login.clicked.connect(toggle_login)
+  def toggle_mining(enabled):
+   self.set_login_mining(enabled);mine.setChecked(autostart_enabled(AUTOSTART) and self.store.load()['start_mining_at_login'])
+  mine.clicked.connect(toggle_mining)
+  for label,widget in [('Shared maximum idle / boost threads',count),('',pause),('',stats),('',dock),('',tray),('',login),('',mine)]:form.addRow(label,widget)
+  note=QLabel('Save each currency’s public Receive address on its native network. ETH payouts use Ethereum (ETH); choose that same network in your wallet and at unMineable. A 0x address alone cannot identify its network. No password, seed phrase or private key is needed.\n\nUse Switch Currency or Open Another Currency from the menu. All running currencies share this thread budget and reserve two CPU cores where possible. Each needs about 3 GB free memory to start.\n\nKeep at least one visibility option selected. Desktops without a usable tray always keep a window visible. Start at Login opens stopped unless you also opt in to start mining every currency with a valid saved wallet. Both login checkboxes take effect immediately. Manual launches open stopped. Saving settings stops this session.');note.setWordWrap(True);form.addRow(note)
   error=QLabel();error.setWordWrap(True);form.addRow(error)
   buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel);form.addRow(buttons);buttons.rejected.connect(dialog.reject)
   def save():
@@ -307,9 +324,15 @@ class Window(QMainWindow):
  def set_login(self,enabled):
   try:
    if enabled:
-    AUTOSTART.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(Path.home()/'.local/share/applications/idle-miner.desktop',AUTOSTART)
-   else:AUTOSTART.unlink(missing_ok=True)
-  except OSError as e:QMessageBox.warning(self,'Login setting could not be saved',str(e))
+    AUTOSTART.parent.mkdir(parents=True,exist_ok=True);AUTOSTART.write_text(login_entry((Path.home()/'.local/share/applications/idle-miner.desktop').read_text()))
+   else:
+    AUTOSTART.unlink(missing_ok=True);save_login_preference(self.store,False)
+   self.refresh_settings()
+  except Exception as e:QMessageBox.warning(self,'Login setting could not be saved',str(e))
+ def set_login_mining(self,enabled):
+  try:
+   save_login_preference(self.store,bool(enabled) and autostart_enabled(AUTOSTART));self.refresh_settings()
+  except Exception as e:QMessageBox.warning(self,'Login setting could not be saved',str(e))
  def open_pool(self):
   if valid_wallet(self.settings['address'],self.settings['coin']):QDesktopServices.openUrl(QUrl(f"https://unmineable.com/coins/{self.settings['coin']}/address/{self.settings['address']}"))
   else:self.settings_dialog()
@@ -339,6 +362,7 @@ def main():
  except ValueError as e:raise SystemExit(str(e))
  app=QApplication(sys.argv);app.setApplicationName('Idle Miner');app.setDesktopFileName('idle-miner');app.setQuitOnLastWindowClosed(False)
  w=Window('--offline-ui-test' in sys.argv,coordinator=coordinator);w.apply_visibility()
+ if '--offline-ui-test' not in sys.argv:QTimer.singleShot(0,lambda:w.apply_startup(sys.argv[1:]))
  signal.signal(signal.SIGTERM,lambda *a:w.quit());signal.signal(signal.SIGINT,lambda *a:w.quit())
  if '--offline-ui-test' in sys.argv:
   def capture():w.grab().save('/tmp/idle-miner-linux.png');print('PASS: Linux UI launched stopped',flush=True);w.quit()

@@ -36,13 +36,21 @@ extension MinerApp {
  }
  @objc func openCurrency(_ sender:NSMenuItem) {
   guard let coin=sender.representedObject as? String else { return }
-  if settings.coin==coin { showStatistics();return }
+  openCurrencyInstance(coin,startMining:false,showStats:true)
+ }
+ func openCurrencyInstance(_ coin:String,startMining:Bool,showStats:Bool) {
+  guard Settings.coins.contains(coin) else { return }
+  if settings.coin==coin { if showStats { showStatistics() };return }
   if let pid=ProfileCoordinator.existingPID(base:baseFolder,profile:coin) {
-   DistributedNotificationCenter.default().postNotificationName(Notification.Name("local.jeff.idleminer.showProfile"),object:coin,userInfo:nil,deliverImmediately:true)
-   NSRunningApplication(processIdentifier:pid)?.activate(options:[]);return
+   if showStats {
+    DistributedNotificationCenter.default().postNotificationName(Notification.Name("local.jeff.idleminer.showProfile"),object:coin,userInfo:nil,deliverImmediately:true)
+    NSRunningApplication(processIdentifier:pid)?.activate(options:[])
+   };return
   }
   let configuration=NSWorkspace.OpenConfiguration();configuration.createsNewApplicationInstance=true
-  configuration.arguments=["--profile=\(coin)","--show-stats"]
+  configuration.arguments=["--profile=\(coin)"]+(startMining ? ["--start-mining"] : [])+(showStats ? ["--show-stats"] : [])
+  configuration.activates=showStats
+  if let handler=profileLaunchHandler { handler(coin,configuration.arguments);return }
   NSWorkspace.shared.openApplication(at:Bundle.main.bundleURL,configuration:configuration) { _,error in
    if let error=error { DispatchQueue.main.async { self.alert("Could not open another instance. \(error.localizedDescription)") } }
   }

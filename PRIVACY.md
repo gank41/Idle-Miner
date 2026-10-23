@@ -1,12 +1,12 @@
 # Privacy and network connections
 
-This describes Idle Miner **1.6.1 (build 9)**. Idle Miner runs locally and does not require an Idle Miner account. The app source contains no developer-operated analytics or telemetry service. Its mining and reporting features contact the third parties below; those services can observe your connection's IP address and the data sent to them.
+This describes Idle Miner **1.7 (build 10)**. Idle Miner runs locally and does not require an Idle Miner account. The app source contains no developer-operated analytics or telemetry service. Its mining and reporting features contact the third parties below; those services can observe your connection's IP address and the data sent to them.
 
 ## Wallet addresses
 
-Idle Miner stores public native-network BTC, LTC, and DOGE Receive addresses and preferences in your user account. It does not need or store wallet passwords, private keys, or recovery phrases. A public address is not a secret key, but sharing it can reveal or link financial activity.
+Idle Miner stores public native-network BTC, LTC, DOGE, and ETH Receive addresses and preferences in your user account. It does not need or store wallet passwords, private keys, or recovery phrases. An ETH `0x` address does not identify its payout network; confirm the provider and wallet networks match. A public address is not a secret key, but sharing it can reveal or link financial activity.
 
-Saving a valid address on Mac allows the app to fetch unMineable statistics automatically, even while mining is stopped. Version 1.6.1 has no Mac reporting opt-out switch. On Linux, Settings has **Read earnings from unMineable using my public receive address**, enabled by default; turning it off disables those address/account API queries. The Linux price query still runs. Starting mining sends the selected address to the pool regardless of that reporting checkbox.
+Saving a valid address on Mac allows the app to fetch unMineable statistics automatically, even while mining is stopped. Version 1.7 has no Mac reporting opt-out switch. On Linux, Settings has **Read earnings from unMineable using my public receive address**, enabled by default; turning it off disables those address/account API queries. The Linux price query still runs. Starting mining sends the selected address to the pool regardless of that reporting checkbox. This also applies to mining started by your separate login-mining opt-in.
 
 ## Connections
 
@@ -35,7 +35,7 @@ Logs and engine configurations can contain public addresses, worker/account deta
 
 - **Stop** ends mining; **Quit** ends that app instance's mining and reporting.
 - Disable Linux address reporting in Settings if desired. Saving Settings stops its mining session.
-- Disable **Start at Login** to prevent the default app instance from opening at login; it normally opens stopped even when enabled.
+- **Start at Login** alone opens the default instance stopped. The separate **Start at Login and Start Mining configured currencies** checkbox is off by default. Enabling both authorizes actual login launches to start all valid saved BTC, LTC, DOGE, and ETH currency profiles, send their addresses to the pool, and consume CPU, memory, electricity, and network resources under the shared limit and safety checks. Manual opens remain stopped. Disabling Start at Login clears and disables the mining checkbox.
 - Quit every instance before backing up or deleting local state. Removing the app does not automatically remove settings or logs.
 
 A payout is handled by the provider and receiving wallet/exchange, not by Idle Miner. Check those services for their current privacy, payout, and deposit policies.

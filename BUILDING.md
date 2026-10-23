@@ -31,8 +31,11 @@ zsh test.sh
 These checks open isolated test windows and run brief offline engine work. Their
 settings are temporary, and offline engine checks earn nothing and connect to no
 pool. Some checks require permission to inspect their own child processes. They
-neither change the installed app nor use your saved wallet. Only the app's ordinary
-Start command or an explicit `--start-mining` launch enables online mining.
+neither change the installed app nor use your saved wallet. Online mining requires the app's ordinary
+Start command, an explicit `--start-mining` launch, or the separate default-off
+**Start at Login and Start Mining configured currencies** opt-in on an actual
+login launch. Manual launches stay stopped. Regression checks must not enable
+login registration or use real wallet addresses.
 
 ## Linux
 
@@ -55,3 +58,8 @@ checksums and a corresponding source snapshot. The source snapshot must include
 the same native/Python controller, supervisor, resources and pinned upstream
 engine source as the downloadable release. Public packages must contain no wallets,
 settings, logs, account balances, developer credentials or private audit records.
+
+Version 1.7 (build 10) adds ETH address/checksum and profile coverage, plus explicit
+login-mining consent and launch-origin checks. Record fresh results in
+[the 1.7 release notes](docs/releases/v1.7.md); earlier release checks do not
+establish coverage for the new build. Native Asahi hardware remains untested.

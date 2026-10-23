@@ -6,7 +6,7 @@ BTC='1BoatSLRHtKNngkdXEeobR76b53LETtpyT'
 class Profiles(unittest.TestCase):
  def test_legacy_migration(self):
   s=core.validated(dict(coin='BTC',address=BTC))
-  self.assertEqual(s.get('wallets'),dict(BTC=BTC,LTC='',DOGE=''))
+  self.assertEqual(s.get('wallets'),dict(BTC=BTC,LTC='',DOGE='',ETH=''))
  def test_invalid_visibility(self):
   with self.assertRaises(ValueError):core.validated(dict(show_dock=False,show_menu_bar=False))
  def test_stale_wallet_dialog_merge(self):
@@ -90,9 +90,9 @@ class WalletMaps(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    store=SettingsStore(Path(d));baseline=store.load();edit=core.validated(baseline)
    edit['wallets']={coin:self.address(version) for coin,version in [('BTC',0),('LTC',48),('DOGE',30)]}
-   result=store.save(edit,baseline);self.assertEqual(result['wallets'],edit['wallets']);self.assertEqual(result['address'],edit['wallets']['LTC'])
+   result=store.save(edit,baseline);self.assertEqual(result['wallets'],{**edit['wallets'],'ETH':''});self.assertEqual(result['address'],edit['wallets']['LTC'])
    switched=core.validated(result);switched['coin']='DOGE';result=store.save(switched,result)
-   self.assertEqual(result['address'],edit['wallets']['DOGE']);self.assertEqual(result['wallets'],edit['wallets'])
+   self.assertEqual(result['address'],edit['wallets']['DOGE']);self.assertEqual(result['wallets'],{**edit['wallets'],'ETH':''})
  def test_peer_dialog_edits_distinct_wallets(self):
   from coordination import SettingsStore
   with tempfile.TemporaryDirectory() as d:

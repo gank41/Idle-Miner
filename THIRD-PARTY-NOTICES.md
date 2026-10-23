@@ -31,4 +31,6 @@ The Linux idle helper uses the distribution-provided KIdleTime library. Its publ
 
 XMRig builds use libraries including libuv, OpenSSL, and hwloc. Python, compiler/build tools, operating-system frameworks, and distribution packages remain governed by their own terms. Preserve the complete notices supplied with any components you redistribute.
 
+Ethereum is an additional payout currency in Idle Miner 1.7, not a bundled Ethereum miner or wallet. The app continues to use XMRig RandomX; unMineable converts credited work into the selected payout currency. Ethereum itself uses proof of stake. See [Ethereum mining information](https://ethereum.org/developers/docs/consensus-mechanisms/pow/mining/) and [unMineable ETH support](https://unmineable.com/coins/ETH).
+
 Coinbase and unMineable provide network services, not application code licensed by this project. Their service terms and privacy policies apply independently. Names and trademarks belong to their respective owners; this project is not endorsed by Apple, Qt, KDE, Coinbase, unMineable, or XMRig.

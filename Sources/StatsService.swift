@@ -13,7 +13,7 @@ final class StatsHTTP:NSObject,URLSessionTaskDelegate {
  func urlSession(_ session:URLSession,task:URLSessionTask,willPerformHTTPRedirection response:HTTPURLResponse,newRequest request:URLRequest,completionHandler:@escaping(URLRequest?)->Void) { completionHandler(nil) }
  func get(_ url:URL)async throws->Data {
   guard url.scheme=="https",["api.unmineable.com","api.coinbase.com"].contains(url.host ?? "") else { throw StatsError.invalidResponse }
-  var req=URLRequest(url:url); req.httpMethod="GET"; req.setValue("IdleMiner/1.2",forHTTPHeaderField:"User-Agent")
+  var req=URLRequest(url:url); req.httpMethod="GET"; req.setValue("IdleMiner/1.7",forHTTPHeaderField:"User-Agent")
   let (data,response)=try await session.data(for:req)
   guard let response=response as? HTTPURLResponse else { throw StatsError.invalidResponse }
   guard response.statusCode==200 else { throw StatsError.http(response.statusCode) }
@@ -42,7 +42,7 @@ final class StatsHTTP:NSObject,URLSessionTaskDelegate {
  func refresh(coin:String,address:String,force:Bool=false) {
   configure(coin:coin,address:address)
   let interval=force ? 30.0 : 120.0
-  guard !refreshing,Date().timeIntervalSince(lastAttempt)>=interval,["LTC","BTC","DOGE"].contains(coin) else { return }
+  guard !refreshing,Date().timeIntervalSince(lastAttempt)>=interval,Settings.coins.contains(coin) else { return }
   lastAttempt=Date(); refreshing=true; let token=generation; updated?()
   task=Task { [weak self] in
    guard let self=self else { return }
@@ -64,7 +64,7 @@ final class StatsHTTP:NSObject,URLSessionTaskDelegate {
    var components=URLComponents(string:"https://api.unmineable.com/v4/address/")!
    components.path += address; components.queryItems=[URLQueryItem(name:"coin",value:coin)]
    let a=try await http.get(components.url!)
-   let id=try PoolSnapshot.identifier(a,address:address)
+   let id=try PoolSnapshot.identifier(a,address:address,coin:coin)
    async let stats=http.get(URL(string:"https://api.unmineable.com/v4/account/\(id)/stats")!)
    async let workers:Data?=try? http.get(URL(string:"https://api.unmineable.com/v4/account/\(id)/workers")!)
    return .success(try await PoolSnapshot.parse(addressData:a,statsData:stats,workersData:workers,coin:coin))

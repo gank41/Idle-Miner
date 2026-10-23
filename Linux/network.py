@@ -6,7 +6,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def get(url):
  if urllib.parse.urlsplit(url).hostname not in ('api.coinbase.com','api.unmineable.com') or not url.startswith('https://'):raise ValueError('Unexpected API URL')
- req=urllib.request.Request(url,headers={'User-Agent':'IdleMinerLinux/1.5'})
+ req=urllib.request.Request(url,headers={'User-Agent':'IdleMinerLinux/1.7'})
  with urllib.request.build_opener(NoRedirect).open(req,timeout=12) as r:
   raw=r.read(2_000_001)
   if len(raw)>2_000_000:raise ValueError('Response too large')
@@ -28,7 +28,11 @@ class Network(QObject):
     try:
      a=get('https://api.unmineable.com/v4/address/'+urllib.parse.quote(s['address'],safe='')+'?coin='+coin)
      d=payload(a)
-     if d['address']!=s['address']:raise ValueError('Address mismatch')
+     reported=d['address']
+     # Ethereum accounts identify 20 bytes, independent of hex letter case;
+     # still reject malformed/checksum-invalid provider addresses.
+     matches=(isinstance(reported,str) and valid_wallet(reported,'ETH') and reported.lower()==s['address'].lower()) if coin=='ETH' else reported==s['address']
+     if not matches:raise ValueError('Address mismatch')
      account=str(uuid.UUID(d['uuid']))
      stats=get(f'https://api.unmineable.com/v4/account/{account}/stats')
      result['pool']=pool_snapshot(a,stats,coin)

@@ -1,24 +1,24 @@
 # Install and use Idle Miner
 
-Idle Miner uses spare CPU time to run the RandomX mining algorithm. unMineable handles the pool work and conversion into your chosen payout currency: Bitcoin (BTC), Litecoin (LTC), or Dogecoin (DOGE). Choosing BTC does not turn your CPU into a Bitcoin ASIC miner; it chooses how the provider accounts for and pays your rewards.
+Idle Miner uses spare CPU time to run the RandomX mining algorithm. unMineable handles the pool work and conversion into your chosen payout currency: Bitcoin (BTC), Litecoin (LTC), Dogecoin (DOGE), or Ethereum (ETH). Choosing BTC does not turn your CPU into a Bitcoin ASIC miner; it chooses how the provider accounts for and pays your rewards.
 
 A public **Receive address** tells the provider where to send a payout. Idle Miner never needs a wallet login, password, recovery phrase, or private key. Mining uses electricity and produces heat; earnings are variable and may be lower than your costs.
 
 ## Download
 
-Get the current packages from [GitHub Releases](https://github.com/gank41/Idle-Miner/releases). For version **1.6.1 (build 9)**, choose:
+Get the current packages from [GitHub Releases](https://github.com/gank41/Idle-Miner/releases). For version **1.7 (build 10)**, choose:
 
 | Computer | Download |
 | --- | --- |
-| Apple Silicon Mac, macOS 14 or later | `Idle-Miner-1.6.1-macOS.dmg` |
-| Supported 64-bit ARM or x86 Linux desktop | `Idle-Miner-1.6.1-Linux.tar.gz` |
+| Apple Silicon Mac, macOS 14 or later | `Idle-Miner-1.7-macOS.dmg` |
+| Supported 64-bit ARM or x86 Linux desktop | `Idle-Miner-1.7-Linux.tar.gz` |
 
-The Linux download is a source installer that builds the engine on your computer. It needs Python/PySide6, Qt 6, KDE Frameworks 6 development packages, and compiler dependencies from your distribution repositories. Fedora, Fedora Asahi, and recent Ubuntu/Debian-family systems are supported by the installer; older releases may lack the required packages. Native Asahi operation has not been verified. See the [release notes](docs/releases/v1.6.1.md) for testing details.
+The Linux download is a source installer that builds the engine on your computer. It needs Python/PySide6, Qt 6, KDE Frameworks 6 development packages, and compiler dependencies from your distribution repositories. Fedora, Fedora Asahi, and recent Ubuntu/Debian-family systems are supported by the installer; older releases may lack the required packages. Native Asahi operation has not been verified. See the [release notes](docs/releases/v1.7.md) for testing details.
 
 ## Install on a Mac
 
 1. If updating, select **Stop** and **Quit** in **every** Idle Miner currency instance before replacing the app.
-2. Open `Idle-Miner-1.6.1-macOS.dmg`.
+2. Open `Idle-Miner-1.7-macOS.dmg`.
 3. Drag **Idle Miner** into **Applications**. Replace the previous copy if updating.
 4. Eject the mounted disk and open **Idle Miner** from Applications.
 
@@ -29,8 +29,8 @@ This build is locally **ad-hoc signed**, and **has not been notarized by Apple**
 ## Install on Linux
 
 1. If updating, stop mining and quit **all** Idle Miner windows/profiles.
-2. Extract `Idle-Miner-1.6.1-Linux.tar.gz`.
-3. Open Terminal in the extracted `Idle-Miner-1.6.1-Linux` folder.
+2. Extract `Idle-Miner-1.7-Linux.tar.gz`.
+3. Open Terminal in the extracted `Idle-Miner-1.7-Linux` folder.
 4. Run:
 
    ```sh
@@ -45,11 +45,19 @@ Run the installer as your normal desktop user. It requests `sudo` only to instal
 
 1. In a compatible wallet or exchange account, open **Receive** for the currency you want.
 2. Copy that currency's public address on its **native network**. Check that the destination supports receiving that currency and any deposit requirements.
-3. Open Idle Miner **Settings** and paste the address into its matching BTC, LTC, or DOGE field. Leave currencies you do not plan to use blank.
+3. Open Idle Miner **Settings** and paste the address into its matching BTC, LTC, DOGE, or ETH field. Leave currencies you do not plan to use blank.
 4. Choose the currency for this instance and save. Check the saved address against your wallet's Receive screen.
 5. Select **Start Mining**.
 
 Saving Settings stops this instance's mining session. Start it again when you are ready. See [Privacy](PRIVACY.md) before saving an address: reporting sends your public address to unMineable, and mining sends it in the pool login. The Mac reports automatically while open; Linux offers a reporting checkbox.
+
+## Ethereum payouts
+
+Ethereum uses [proof of stake rather than mining](https://ethereum.org/developers/docs/consensus-mechanisms/pow/mining/). Idle Miner uses CPU RandomX work; [unMineable converts credited rewards into ETH](https://unmineable.com/coins/ETH). Selecting ETH does not directly mine Ethereum.
+
+Use a native ETH Receive address: `0x` followed by 40 hexadecimal characters (20 bytes). All-lowercase and all-uppercase hex addresses are accepted; mixed-case addresses must have a valid EIP-55 checksum. ENS names, payment URIs, and token contract addresses are not Receive-address substitutes. Validation checks address format, not ownership or deposit eligibility.
+
+unMineable lists Ethereum as its default ETH payout network. Before mining, open **Pool Payouts** and confirm that the provider's selected network and your wallet or exchange's ETH Receive network match. The same `0x` format is used on multiple networks, so Idle Miner cannot infer a network from the address. Provider network choices are managed outside the app. Check current thresholds, fees, and deposit requirements there; do not choose a network solely for a lower threshold.
 
 ## Daily controls
 
@@ -98,7 +106,9 @@ On Mac, Settings lets you show a Dock icon, a menu bar icon, or both. The menu b
 
 On Linux, these options control the main window/taskbar and tray presence. A desktop without a usable tray keeps the main window accessible. Closing hides the window only when a usable visible tray remains; otherwise it quits and stops mining. GNOME tray support depends on the desktop setup.
 
-**Start at Login** opens the default instance stopped. Additional currency instances must be opened and started separately.
+**Start at Login** alone opens the default instance stopped. Directly beneath it, **Start at Login and Start Mining configured currencies** is a separate opt-in checkbox, off by default. When both are enabled, an actual login launch opens a profile and starts automatic mining for each valid saved BTC, LTC, DOGE, and ETH address. Currencies without a saved address are skipped. Invalid or unreadable settings require attention before automatic startup. It does not create wallets or copy an address into another currency.
+
+All started profiles share your configured CPU limit and retain the usual safety checks. Each active engine can require its own roughly 2 GB dataset, so enabling several currencies increases memory, electricity, and heat use after login. Manual app openings remain stopped. Turning off **Start at Login** clears and disables the mining checkbox. You can still select **Start Mining** explicitly whenever ready.
 
 ## Keep or remove your settings
 

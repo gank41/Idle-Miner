@@ -124,9 +124,14 @@ struct PoolSnapshot {
  static func payload(_ data:Data)throws->[String:Any] {
   guard let root=try JSONSerialization.jsonObject(with:data) as? [String:Any],root["success"] as? Bool==true,let d=root["data"] as? [String:Any] else { throw StatsError.invalidResponse }; return d
  }
- static func identifier(_ data:Data,address:String)throws->String {
+ static func identifier(_ data:Data,address:String,coin:String?=nil)throws->String {
   let d=try payload(data)
-  guard d["address"] as? String==address,let id=d["uuid"] as? String,UUID(uuidString:id) != nil else { throw StatsError.invalidResponse }; return id
+  guard let received=d["address"] as? String else { throw StatsError.invalidResponse }
+  let matches:Bool
+  if coin=="ETH" {
+   matches=Wallet.valid(address,coin:"ETH") && Wallet.valid(received,coin:"ETH") && received.lowercased()==address.lowercased()
+  } else { matches=received==address }
+  guard matches,let id=d["uuid"] as? String,UUID(uuidString:id) != nil else { throw StatsError.invalidResponse }; return id
  }
  static func parse(addressData:Data,statsData:Data,workersData:Data?,coin:String,now:Date=Date())throws->PoolSnapshot {
   let a=try payload(addressData),s=try payload(statsData)

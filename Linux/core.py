@@ -2,16 +2,53 @@
 import hashlib, json, math, re, time
 from dataclasses import dataclass
 
-VERSION = '1.6.1'
-BUILD = 9
+VERSION = '1.7'
+BUILD = 10
 DURATIONS = (15, 30, 60, 360, 720, 1440)
-COINS = ('BTC','LTC','DOGE')
-DEFAULTS = dict(coin='LTC', address='', wallets=dict.fromkeys(COINS,''), idle_threads=4, pause_active=False, pool_stats=True, show_dock=True, show_menu_bar=True)
+COINS = ('BTC','LTC','DOGE','ETH')
+DEFAULTS = dict(coin='LTC', address='', wallets=dict.fromkeys(COINS,''), idle_threads=4, pause_active=False, pool_stats=True, show_dock=True, show_menu_bar=True, start_mining_at_login=False)
 def now():
     return time.clock_gettime(time.CLOCK_BOOTTIME) if hasattr(time,'CLOCK_BOOTTIME') else time.monotonic()
 
+def keccak256(data):
+    """Ethereum Keccak-256 (legacy 0x01 padding, distinct from SHA3-256).
+
+    Keccak-f[1600], little-endian lanes; used for EIP-55 addresses.
+    https://eips.ethereum.org/EIPS/eip-55
+    """
+    mask=(1<<64)-1
+    rotations=((0,36,3,41,18),(1,44,10,45,2),(62,6,43,15,61),(28,55,25,21,56),(27,20,39,8,14))
+    rounds=(0x0000000000000001,0x0000000000008082,0x800000000000808a,0x8000000080008000,
+      0x000000000000808b,0x0000000080000001,0x8000000080008081,0x8000000000008009,
+      0x000000000000008a,0x0000000000000088,0x0000000080008009,0x000000008000000a,
+      0x000000008000808b,0x800000000000008b,0x8000000000008089,0x8000000000008003,
+      0x8000000000008002,0x8000000000000080,0x000000000000800a,0x800000008000000a,
+      0x8000000080008081,0x8000000000008080,0x0000000080000001,0x8000000080008008)
+    def rotate(v,n):return ((v<<n)|(v>>(64-n)))&mask
+    padded=bytearray(data);padded.append(1)
+    padded.extend(bytes((-len(padded))%136));padded[-1]|=0x80
+    lanes=[0]*25
+    for offset in range(0,len(padded),136):
+        for i in range(17):lanes[i]^=int.from_bytes(padded[offset+8*i:offset+8*i+8],'little')
+        for rc in rounds:
+            columns=[lanes[x]^lanes[x+5]^lanes[x+10]^lanes[x+15]^lanes[x+20] for x in range(5)]
+            delta=[columns[(x-1)%5]^rotate(columns[(x+1)%5],1) for x in range(5)]
+            b=[0]*25
+            for x in range(5):
+                for y in range(5):b[y+5*((2*x+3*y)%5)]=rotate(lanes[x+5*y]^delta[x],rotations[x][y])
+            for x in range(5):
+                for y in range(5):lanes[x+5*y]=b[x+5*y]^((~b[(x+1)%5+5*y])&b[(x+2)%5+5*y])
+            lanes[0]^=rc
+    return b''.join(v.to_bytes(8,'little') for v in lanes)[:32]
+
 def valid_wallet(s, coin):
-    if coin not in ('BTC','LTC','DOGE') or not s or len(s)>90 or not s.isascii() or s.strip()!=s: return False
+    if coin not in COINS or not s or len(s)>90 or not s.isascii() or s.strip()!=s: return False
+    if coin=='ETH':
+        if not re.fullmatch(r'0x[0-9a-fA-F]{40}',s) or int(s[2:],16)==0:return False
+        body=s[2:]
+        if body in (body.lower(),body.upper()):return True
+        digest=keccak256(body.lower().encode('ascii')).hex()
+        return all(c==c.upper() if int(digest[i],16)>=8 else c==c.lower() for i,c in enumerate(body))
     if s.lower().startswith(('bc1','ltc1')):
         hrp={'BTC':'bc','LTC':'ltc'}.get(coin,'')
         if not hrp or s not in (s.lower(),s.upper()) or not s.lower().startswith(hrp+'1'): return False
@@ -38,9 +75,9 @@ def valid_wallet(s, coin):
 
 def validated(s):
     result={**DEFAULTS,**s}
-    if result['coin'] not in COINS: raise ValueError('Choose BTC, LTC or DOGE.')
+    if result['coin'] not in COINS: raise ValueError('Choose BTC, LTC, DOGE or ETH.')
     if type(result['idle_threads']) is not int or result['idle_threads'] not in (2,4,8,12): raise ValueError('Invalid thread count.')
-    for key in ('pause_active','pool_stats','show_dock','show_menu_bar'):
+    for key in ('pause_active','pool_stats','show_dock','show_menu_bar','start_mining_at_login'):
         if type(result[key]) is not bool: raise ValueError('Invalid settings.')
     if not result['show_dock'] and not result['show_menu_bar']: raise ValueError('Keep the window or menu bar visible.')
     supplied=s.get('wallets',{})

@@ -20,10 +20,13 @@ class SmokeApp:MinerApp {
   super.applicationDidFinishLaunching(n)
   showSettings()
   let login=loginManager as! FakeLoginItem
-  precondition(loginItem.state == .off && loginCheck.state == .off,"Login default state")
+  precondition(loginItem.state == .off && loginCheck.state == .off && !loginMiningCheck.isEnabled && loginMiningCheck.state == .off,"Login mining must default off and require parent login")
   NSApp.sendAction(loginItem.action!,to:loginItem.target,from:loginItem)
   precondition(loginItem.state == .on && loginCheck.state == .on,"Menu and Settings must both enable")
+  loginMiningCheck.performClick(nil)
+  precondition(settings.startMiningAtLogin && loginMiningCheck.state == .on && !enabled,"Login opt-in persists without starting now")
   loginCheck.performClick(nil)
+  precondition(!settings.startMiningAtLogin && loginMiningCheck.state == .off && !loginMiningCheck.isEnabled,"Parent off clears and disables mining opt-in")
   precondition(loginItem.state == .off && loginCheck.state == .off,"Menu and Settings must both disable")
   login.needsApproval=true; toggleLoginItem()
   precondition(loginItem.state == .mixed && loginCheck.state == .mixed && !loginApprovalItem.isHidden,"Pending approval must not appear enabled")
@@ -125,15 +128,16 @@ class SmokeApp:MinerApp {
     try? bitmap.representation(using:.png,properties:[:])?.write(to:URL(fileURLWithPath:"/private/tmp/idle-miner-about.png"))
    }
    self.showSettings()
-   precondition(self.walletFields.count==3,"All currency wallets must be editable together")
+   precondition(self.walletFields.count==4,"All currency wallets must be editable together")
    self.walletFields["LTC"]!.stringValue="LKKHMBjCU89fyFNgSRprDoD8Jb25N8uWvd"
    self.walletFields["DOGE"]!.stringValue="D5ERdEN1gsouFSs7zsq7VYJxyWP6dP28H1"
    self.walletFields["BTC"]!.stringValue="1BoatSLRHtKNngkdXEeobR76b53LETtpyT"
+   self.walletFields["ETH"]!.stringValue="0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"
    self.coinField.selectItem(withTitle:"BTC")
    self.dockCheck.state = .off;self.menuBarCheck.state = .off;self.saveSettings()
    precondition(self.formError.stringValue.contains("Keep"),"Neither visibility path must be rejected")
    self.dockCheck.state = .on;self.saveSettings()
-   precondition(self.settings.coin=="BTC" && self.settings.wallets.count==3,"Save all wallets and select currency")
+   precondition(self.settings.coin=="BTC" && self.settings.wallets.count==4,"Save all wallets and select currency")
    precondition(NSApp.activationPolicy() == .regular && !self.statusItem.isVisible,"Dock-only mode")
    _=self.applicationShouldHandleReopen(NSApp,hasVisibleWindows:false)
    precondition(self.statsWindow!.window.isVisible,"Dock reopen must show Stats")
@@ -146,6 +150,9 @@ class SmokeApp:MinerApp {
    self.toggleMenuBar();self.toggleDock()
    precondition(NSApp.activationPolicy() == .accessory && self.statusItem.isVisible,"Menu-only mode")
    precondition(self.dockCheck.state == .off && self.menuBarCheck.state == .on,"Menu visibility changes refresh Settings controls")
+   let ethereum=NSMenuItem();ethereum.representedObject="ETH";self.switchCurrency(ethereum)
+   precondition(self.settings.coin=="ETH" && self.settings.address==self.walletFields["ETH"]!.stringValue && !self.enabled,"ETH switches to its own saved wallet without starting")
+   self.coinField.selectItem(withTitle:"ETH");self.updateGuidance();precondition(self.guidance.stringValue.contains("Ethereum"),"ETH network guidance")
    let coin=NSMenuItem();coin.representedObject="DOGE";self.switchCurrency(coin)
    precondition(self.settings.coin=="DOGE" && self.settings.address=="D5ERdEN1gsouFSs7zsq7VYJxyWP6dP28H1" && !self.enabled,"Menu switch restores matching saved wallet and stays stopped")
    precondition(self.sessionClock.startedDate==nil && self.sessionClock.uptime()>0,"A different currency starts with a fresh session and retains app uptime")

@@ -15,14 +15,28 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.8</string>
+	<string>1.9</string>
 	<key>CFBundleVersion</key>
-	<string>11</string>
+	<string>12</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://idleminer.app/updates/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>eJ09A18pAdxNHEU6i9b1hp+tnJ5udezI9fJW5uH03D8=</string>
+	<key>SURequireSignedFeed</key>
+	<true/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
 	<true/>
 </dict>
 </plist>

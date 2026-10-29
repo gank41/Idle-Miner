@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Idle Miner for Linux. A user session app; never a privileged mining service."""
-import os,sys,json,signal,fcntl,shutil,uuid,time,subprocess
+import os,sys,json,signal,fcntl,shutil,uuid,time,subprocess,threading,tempfile
 from pathlib import Path
 from PySide6.QtCore import Qt,QTimer,QProcess,QUrl,QPointF,QDateTime,QLocale,QObject,Signal
 from PySide6.QtGui import QIcon,QPixmap,QPainter,QPen,QColor,QFont,QDesktopServices,QAction
@@ -11,7 +11,7 @@ from startup import startup_plan,autostart_enabled,login_entry,save_login_prefer
 from platform_linux import Sensors
 from network import Network
 from shared_tray import SharedTray,profile_currency,focus_matches
-from updates import check_async,newer
+from updates import check_async,newer,install_metadata,prepare_update,UpdateCancelled,request_shutdown
 ROOT=Path(__file__).resolve().parent
 STATE=Path(os.environ.get('IDLE_MINER_STATE',str(Path.home()/'.config/idle-miner')))
 PROFILE=next((arg.split('=',1)[1] for arg in sys.argv if arg.startswith('--profile=')),'default')
@@ -22,6 +22,9 @@ def profile_conflict_message(coin,current):
 
 class UpdateBridge(QObject):
  ready=Signal(object)
+ progress=Signal(str)
+ prepared=Signal(object)
+ failed=Signal(str)
 
 class Graph(QWidget):
  def __init__(self,work):
@@ -79,7 +82,7 @@ class Window(QMainWindow):
   layout.addStretch();scroll=QScrollArea();scroll.setWidgetResizable(True);scroll.setFrameShape(QScrollArea.Shape.NoFrame);scroll.setWidget(page);self.tabs.addTab(scroll,'Mining Stats')
   self.log=QPlainTextEdit();self.log.setReadOnly(True);self.log.document().setMaximumBlockCount(1200);self.tabs.addTab(self.log,'Engine Log')
   menu=self.menuBar().addMenu('Idle Miner');self.populate(menu)
-  self.shared_tray=SharedTray(STATE,self.coordinator);self.currency_menus={};self.update_busy=False;self.update_last=-1000;self.quit_group=None;self.update_bridge=UpdateBridge(self);self.update_bridge.ready.connect(self.update_result)
+  self.shared_tray=SharedTray(STATE,self.coordinator);self.currency_menus={};self.update_busy=False;self.update_last=-1000;self.quit_group=None;self.update_bridge=UpdateBridge(self);self.update_bridge.ready.connect(self.update_result);self.update_bridge.progress.connect(self.update_progress);self.update_bridge.prepared.connect(self.update_prepared);self.update_bridge.failed.connect(self.update_failed);self.update_dialog=None;self.update_preparing=False;self.update_cancel=threading.Event()
   self.tray=QSystemTrayIcon(QIcon(str(ROOT/'icon.png')),self);self.tray_menu=QMenu()
   self.summary=QLabel('Stopped');self.summary.setWordWrap(True);self.summary.setContentsMargins(14,10,14,10);self.summary.setMinimumWidth(320)
   self.tray_menu.aboutToShow.connect(self.rebuild_tray_menu);self.rebuild_tray_menu()
@@ -325,20 +328,72 @@ class Window(QMainWindow):
    self.quit_group=None;self.show_stats();QMessageBox.warning(self,'A currency is still stopping','Wait for the remaining currency to stop, then try Quit Idle Miner again.');return
   QTimer.singleShot(250,self.check_quit_all)
  def check_updates(self):
+  if self.update_preparing:
+   if self.update_dialog:self.update_dialog.show();self.update_dialog.raise_()
+   return
   if self.update_busy:QMessageBox.information(self,'Checking for updates','An update check is already in progress.');return
+  if self.update_dialog and self.update_dialog.isVisible():self.update_dialog.raise_();return
   if now()-self.update_last<30:QMessageBox.information(self,'Check for Updates','Please wait a moment before checking again.');return
+  self.update_cancel=threading.Event();self.update_release=None
+  dialog=QDialog(self);dialog.setWindowTitle('Check for Updates');dialog.resize(600,440);layout=QVBoxLayout(dialog)
+  self.update_versions=QLabel(f'Installed: Idle Miner {VERSION} ({BUILD})\nLatest: checking…');layout.addWidget(self.update_versions)
+  self.update_status=QLabel('Checking for updates…');self.update_status.setTextFormat(Qt.TextFormat.PlainText);self.update_status.setWordWrap(True);layout.addWidget(self.update_status)
+  label=QLabel('Latest release notes');layout.addWidget(label)
+  self.update_notes=QPlainTextEdit();self.update_notes.setReadOnly(True);self.update_notes.setPlainText('Checking for release notes…');layout.addWidget(self.update_notes)
+  row=QHBoxLayout();row.addStretch();close=QPushButton('Close');close.clicked.connect(dialog.reject);row.addWidget(close)
+  self.update_install=QPushButton('Download and Install Now');self.update_install.setEnabled(False);self.update_install.clicked.connect(self.install_update);row.addWidget(self.update_install);layout.addLayout(row)
+  dialog.finished.connect(lambda _:self.update_cancel.set());self.update_dialog=dialog;dialog.show()
   self.update_busy=True;self.update_last=now();check_async(self.update_bridge.ready.emit)
  def update_result(self,result):
   self.update_busy=False
+  if self.quitting or self.update_dialog is None:return
+  self.update_install.setEnabled(False)
+  if result['error']:
+   self.update_versions.setText(f'Installed: Idle Miner {VERSION} ({BUILD})\nLatest: unavailable');self.update_status.setText(result['error']);self.update_notes.setPlainText('Release notes are unavailable.');return
+  release=result['manifest'];self.update_release=release
+  self.update_versions.setText(f"Installed: Idle Miner {VERSION} ({BUILD})\nLatest: Idle Miner {release['version']} ({release['build']})")
+  self.update_notes.setPlainText(release['releaseNotesText'])
+  if not newer(release['version'],release['build'],VERSION,BUILD):self.update_status.setText('Idle Miner is up to date.');return
+  try:install_metadata(release)
+  except ValueError as exc:self.update_status.setText(str(exc));return
+  self.update_status.setText('The update will install in this app’s current location. Settings and wallets are kept. All currencies will quit after preparation; Idle Miner will reopen stopped.');self.update_install.setEnabled(True)
+ def update_progress(self,text):
+  if self.update_dialog:self.update_status.setText(text)
+ def update_failed(self,message):
+  self.update_preparing=False
   if self.quitting:return
-  if result['error']:QMessageBox.warning(self,'Update check failed',result['error']);return
-  release=result['manifest']
-  if not newer(release['version'],release['build'],VERSION,BUILD):QMessageBox.information(self,'Idle Miner is up to date',f'Version {VERSION} ({BUILD}) is the latest available version.');return
-  dialog=QMessageBox(self);dialog.setWindowTitle('Idle Miner update available');dialog.setText(f"Idle Miner {release['version']} ({release['build']}) is available.")
-  dialog.setInformativeText('Download the Linux installer in your browser. Quit all Idle Miner currencies before running the installer. Your mining session continues until you choose to stop it.')
-  download=dialog.addButton('Download Installer',QMessageBox.ButtonRole.AcceptRole);notes=dialog.addButton('Release Notes',QMessageBox.ButtonRole.HelpRole);dialog.addButton(QMessageBox.StandardButton.Cancel);dialog.exec()
-  if dialog.clickedButton()==download:QDesktopServices.openUrl(QUrl(release['url']))
-  elif dialog.clickedButton()==notes:QDesktopServices.openUrl(QUrl(release['releaseNotesURL']))
+  self.update_progress(message)
+  if self.update_dialog and self.update_dialog.isVisible():self.update_install.setEnabled(bool(self.update_release))
+ def install_update(self):
+  if self.update_preparing or not self.update_release:return
+  self.update_preparing=True;self.update_install.setEnabled(False);release=dict(self.update_release);cancel=self.update_cancel
+  def prepare():
+   workspace=Path(tempfile.mkdtemp(prefix='idle-miner-update-'))
+   try:
+    stage=prepare_update(release,workspace,cancel,self.update_bridge.progress.emit)
+    self.update_bridge.prepared.emit(dict(stage=str(stage),workspace=str(workspace)))
+   except Exception as exc:
+    shutil.rmtree(workspace,ignore_errors=True);self.update_bridge.failed.emit(str(exc))
+  threading.Thread(target=prepare,daemon=True).start()
+ def update_prepared(self,result):
+  workspace=Path(result['workspace'])
+  if self.update_cancel.is_set() or self.quitting:
+   shutil.rmtree(workspace,ignore_errors=True);self.update_preparing=False;return
+  try:
+   targets=[row for row in self.shared_tray.snapshots(by_profile=True).values() if row['profile']!=self.profile]
+   # Legacy/unresponsive windows must not be silently skipped by the shared tray.
+   from shared_tray import held
+   known={self.profile,*(row['profile'] for row in targets)}
+   for profile in ('default',*COINS):
+    if profile not in known and held(STATE/('app.lock' if profile=='default' else profile+'.lock')):raise ValueError('A currency window has not reported its status. Close that window, then try installing again.')
+   helper=workspace/'update-helper.py';shutil.copy2(ROOT/'updates.py',helper)
+   # Queue every Stop before any Quit, so no currency keeps mining during shutdown.
+   request_shutdown(self.shared_tray,targets)
+   # The helper waits for every app and engine lease; it never kills installed miners.
+   subprocess.Popen([sys.executable,str(helper),'--install-prepared',result['stage'],str(ROOT),str(STATE),str(workspace)],cwd=workspace,start_new_session=True,close_fds=True)
+   self.update_preparing=False;self.stop();self.quit()
+  except Exception as exc:
+   shutil.rmtree(workspace,ignore_errors=True);self.update_failed('Could not begin installation. '+str(exc))
  def apply_visibility(self):
   tray_available=QSystemTrayIcon.isSystemTrayAvailable()
   self.tray.setVisible(self.settings['show_menu_bar'] and tray_available and self.shared_tray.owner)
@@ -446,6 +501,8 @@ class Window(QMainWindow):
   else:self.quit();event.accept()
  def quit(self):
   if self.quitting:return
+  if self.update_preparing:
+   self.update_cancel.set();self.update_progress('Cancelling update preparation before quitting…');QTimer.singleShot(250,self.quit);return
   self.quitting=True;self.timer.stop();self.enabled=False;self.stop_engine()
   if self.proc:
    if not self.proc.waitForFinished(5500):
@@ -466,6 +523,14 @@ def main():
  app=QApplication(sys.argv);app.setApplicationName('Idle Miner');app.setDesktopFileName('idle-miner');app.setQuitOnLastWindowClosed(False)
  w=Window('--offline-ui-test' in sys.argv,coordinator=coordinator);w.apply_visibility()
  if '--offline-ui-test' not in sys.argv:QTimer.singleShot(0,lambda:w.apply_startup(sys.argv[1:]))
+ if '--update-result' in sys.argv:
+  def show_update_result():
+   try:
+    from shared_tray import read_json
+    result=STATE/'update-result.json';message=read_json(result).get('message','');result.unlink(missing_ok=True)
+    if isinstance(message,str) and message and len(message)<=6000:w.show_stats();QMessageBox.information(w,'Idle Miner update',message)
+   except (OSError,ValueError):pass
+  QTimer.singleShot(100,show_update_result)
  signal.signal(signal.SIGTERM,lambda *a:w.quit());signal.signal(signal.SIGINT,lambda *a:w.quit())
  if '--offline-ui-test' in sys.argv:
   def capture():w.grab().save('/tmp/idle-miner-linux.png');print('PASS: Linux UI launched stopped',flush=True);w.quit()

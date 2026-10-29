@@ -19,11 +19,11 @@ class UpdateTests(unittest.TestCase):
    with self.assertRaises(ValueError):parse_manifest(d)
  def test_fetch_is_bounded_and_redirects_rejected(self):
   class Response(io.BytesIO):
-   def geturl(self):return MANIFEST_URL
+   def geturl(self):return MANIFEST_URL+'.sig'
   for raw,url,good in [(json.dumps(MANIFEST).encode(),MANIFEST_URL,True),(b' ' * 65537,MANIFEST_URL,False),(json.dumps(MANIFEST).encode(),'https://evil.test/',False)]:
    response=Response(raw);response.geturl=lambda:url
-   with patch('updates.urllib.request.build_opener') as opener:
-    opener.return_value.open.return_value=response
+   with patch('updates.verify_manifest'),patch('updates.urllib.request.build_opener') as opener:
+    opener.return_value.open.side_effect=[response,Response(b'signature')]
     if good:self.assertEqual(fetch_manifest()['version'],'1.8')
     else:
      with self.assertRaises(ValueError):fetch_manifest()

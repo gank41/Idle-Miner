@@ -27,6 +27,10 @@ The Linux idle helper uses the distribution-provided KIdleTime library. Its publ
 - [KIdleTime documentation](https://api.kde.org/kidletime-index.html)
 - [Upstream source and header notice](https://github.com/KDE/kidletime/blob/master/src/kidletime.h)
 
+## Sparkle 2.10.1 (macOS)
+
+The Mac app embeds [Sparkle 2.10.1](https://github.com/sparkle-project/Sparkle/releases/tag/2.10.1), the open-source application update framework. Sparkle uses a BSD-style license; retain its complete copyright, license, and component notices from the framework distribution in the app and corresponding source distribution. The release tooling uses Sparkle's official `sign_update` and `generate_keys` programs. Update signing does not imply Apple notarization.
+
 ## Other dependencies and external services
 
 XMRig builds use libraries including libuv, OpenSSL, and hwloc. Python, compiler/build tools, operating-system frameworks, and distribution packages remain governed by their own terms. Preserve the complete notices supplied with any components you redistribute.
@@ -35,4 +39,4 @@ Ethereum is an additional payout currency in Idle Miner 1.7, not a bundled Ether
 
 Coinbase and unMineable provide network services, not application code licensed by this project. Their service terms and privacy policies apply independently. Names and trademarks belong to their respective owners; this project is not endorsed by Apple, Qt, KDE, Coinbase, unMineable, or XMRig.
 
-The Idle Miner website, release downloads, and manual update manifest are hosted by Cloudflare at [idleminer.app](https://idleminer.app/). Cloudflare provides hosting, not application code; its service terms and privacy policies apply to requests handled by that service.
+The Idle Miner website, release downloads, and signed update feeds are hosted by Cloudflare at [idleminer.app](https://idleminer.app/). Cloudflare provides hosting, not application code; its service terms and privacy policies apply to requests handled by that service.

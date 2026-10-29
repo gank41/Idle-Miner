@@ -2,46 +2,50 @@
 import { readFile, writeFile, mkdir, copyFile, readdir, stat } from 'node:fs/promises';
 import { resolve, dirname, basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createHash } from 'node:crypto';
+import { inspectRelease, publicKey, validateManifest, verifySignature, verifyAppcastManifest, verifyArchives, externalOutput } from './update-feed-lib.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const { marked } = await import(process.env.IDLE_MINER_MARKED_MODULE ? pathToFileURL(process.env.IDLE_MINER_MARKED_MODULE).href : 'marked');
-const options = {};
-for (let i = 2; i < process.argv.length; i += 2) options[process.argv[i]] = process.argv[i + 1];
+const options = {}, previousDirectories = [];
+const allowed = new Set(['--release-dir', '--manifest', '--output', '--previous-release-dir', '--public-key-file']);
+for (let i = 2; i < process.argv.length; i += 2) {
+  const flag = process.argv[i], value = process.argv[i + 1];
+  if (!allowed.has(flag) || !value) throw new Error(`Invalid option: ${flag}`);
+  if (flag === '--previous-release-dir') previousDirectories.push(resolve(value));
+  else { if (options[flag]) throw new Error(`Duplicate option: ${flag}`); options[flag] = value; }
+}
 if (!options['--release-dir'] || !options['--manifest'] || !options['--output']) {
-  throw new Error('Usage: node build-site.mjs --release-dir PATH --manifest PATH --output NEW_DIRECTORY');
+  throw new Error('Usage: node build-site.mjs --release-dir PATH --manifest PATH --previous-release-dir PATH --output NEW_DIRECTORY');
 }
 const releaseDir = resolve(options['--release-dir']);
-const output = resolve(options['--output']);
-if (output === root || output.startsWith(root + '/') || output === releaseDir) throw new Error('Use a new staging directory outside the source and release folders.');
-try { await stat(output); throw new Error('Staging directory already exists; choose a new empty destination.'); }
-catch (error) { if (error.code !== 'ENOENT') throw error; }
-const manifest = JSON.parse(await readFile(options['--manifest'], 'utf8'));
-if (manifest.schemaVersion !== 1 || !/^\d+(\.\d+){1,2}$/.test(manifest.version) || !Number.isSafeInteger(manifest.build) || manifest.build < 1) throw new Error('Invalid release manifest.');
+const output = await externalOutput(options['--output'], [root, releaseDir, ...previousDirectories]);
+const manifestPath = resolve(options['--manifest']);
+const manifestBytes = await readFile(manifestPath);
+if (manifestBytes.length > 65536) throw new Error('Oversized release manifest.');
+const key = publicKey(await readFile(resolve(options['--public-key-file'] ?? join(root, 'Linux/update_public_key.txt')), 'utf8'));
+const manifestSignature = await readFile(manifestPath + '.sig', 'utf8');
+verifySignature(manifestBytes, manifestSignature, key, 'stable.json');
+const manifest = JSON.parse(manifestBytes.toString('utf8'));
+validateManifest(manifest);
 const version = manifest.version;
-if (manifest.releaseNotesURL !== `https://idleminer.app/releases/v${version}.html`) throw new Error('Unexpected release notes URL.');
 const releasePage = await readFile(join(root, 'docs/releases', `v${version}.md`), 'utf8');
 if (!releasePage.includes(`(build ${manifest.build})`)) throw new Error('Release notes do not match the manifest build.');
-const files = [
-  `Idle-Miner-${version}-macOS.dmg`, `Idle-Miner-${version}-Linux.tar.gz`,
-  `Idle-Miner-${version}-source.tar.gz`, 'SHA256SUMS.txt', 'LICENSE.txt', 'Idle-Miner-How-To.md'
-];
-for (const file of files) {
-  const size = (await stat(join(releaseDir, file))).size;
-  if (!size || size >= 25 * 1024 * 1024) throw new Error(`Missing, empty or oversized Pages asset: ${file}`);
+const records = await inspectRelease(releaseDir, version);
+verifyArchives(manifest, records, key);
+const appcastBytes = await readFile(join(dirname(manifestPath), 'appcast.xml'));
+if (appcastBytes.length > 65536) throw new Error('Oversized appcast.');
+verifyAppcastManifest(appcastBytes, key, manifest);
+const previousReleases = new Map();
+for (const directory of previousDirectories) {
+  const candidates = (await readdir(directory)).map(name => /^Idle-Miner-(\d+(?:\.\d+){1,2})-macOS\.dmg$/.exec(name)).filter(Boolean);
+  if (candidates.length !== 1) throw new Error('Previous release directory must contain exactly one standard Mac release archive.');
+  const oldVersion = candidates[0][1];
+  if (oldVersion === version || previousReleases.has(oldVersion)) throw new Error('Duplicate current or previous release version.');
+  const oldRecords = await inspectRelease(directory, oldVersion);
+  previousReleases.set(oldVersion, { directory, records: oldRecords });
 }
-for (const [platform, suffix] of [['macos', 'macOS.dmg'], ['linux', 'Linux.tar.gz']]) {
-  const name = `Idle-Miner-${version}-${suffix}`;
-  const entry = manifest.platforms?.[platform];
-  const checksum = createHash('sha256').update(await readFile(join(releaseDir, name))).digest('hex');
-  if (entry?.url !== `https://idleminer.app/downloads/v${version}/${name}` || entry?.sha256 !== checksum) throw new Error(`Invalid ${platform} download URL or checksum.`);
-}
-const sums = await readFile(join(releaseDir, 'SHA256SUMS.txt'), 'utf8');
-for (const file of files.filter(name => name !== 'SHA256SUMS.txt')) {
-  const digest = createHash('sha256').update(await readFile(join(releaseDir, file))).digest('hex');
-  if (!sums.split('\n').some(line => line.startsWith(digest) && line.trimEnd().endsWith(file))) throw new Error(`Checksum file does not cover ${file}.`);
-}
+if (manifest.build > 11 && !previousReleases.has('1.8')) throw new Error('Keep immutable v1.8 download URLs: supply --previous-release-dir for the original audited 1.8 release.');
 await mkdir(output, { recursive: false });
 const copy = async (source, destination) => { await mkdir(dirname(destination), { recursive: true }); await copyFile(source, destination); };
 for (const name of ['index.html', 'site.css', '_headers', '_redirects']) await copy(join(root, 'docs', name), join(output, name));
@@ -90,7 +94,12 @@ for (const file of releaseFiles) {
   await writeFile(join(output, 'releases', htmlName), frame('Release ' + basename(file, '.md'), rewriteLinks(marked.parse(content)), '/releases/' + htmlName));
 }
 await writeFile(join(output, 'releases/index.html'), frame('Release notes', '<h1>Release notes</h1><ul>' + releaseFiles.map(file => `<li><a href="/releases/${file.replace(/\.md$/, '.html')}">${esc(basename(file, '.md'))}</a></li>`).join('') + `</ul><p><a href="/downloads/v${version}/SHA256SUMS.txt">Current release SHA-256 checksums</a></p>`, '/releases/'));
-for (const name of files) await copy(join(releaseDir, name), join(output, 'downloads', 'v' + version, name));
+for (const name of records.keys()) await copy(join(releaseDir, name), join(output, 'downloads', 'v' + version, name));
+for (const [oldVersion, { directory, records: oldRecords }] of previousReleases) {
+  for (const name of oldRecords.keys()) await copy(join(directory, name), join(output, 'downloads', 'v' + oldVersion, name));
+}
 await mkdir(join(output, 'updates'));
-await writeFile(join(output, 'updates/stable.json'), JSON.stringify(manifest, null, 2) + '\n');
-console.log(`Built ${output}: Idle Miner ${version} (build ${manifest.build}), verified installer URLs, hashes, release checksum coverage and Pages file sizes.`);
+await writeFile(join(output, 'updates/stable.json'), manifestBytes);
+await writeFile(join(output, 'updates/stable.json.sig'), manifestSignature);
+await writeFile(join(output, 'updates/appcast.xml'), appcastBytes);
+console.log(`Built ${output}: Idle Miner ${version} (build ${manifest.build}), authenticated feeds and archives, installer URLs, hashes, immutable previous downloads, checksum coverage and Pages file sizes.`);

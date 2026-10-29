@@ -13,6 +13,10 @@ import ServiceManagement
  func openSystemSettings() { opened=true }
 }
 class SmokeApp:MinerApp {
+ // Controller tests use a healthy fixture environment; production keeps real safety sensors.
+ override func environmentSample()->Environment { Environment() }
+ var blockForUpdate=false
+ override var updateBlocksMining:Bool { blockForUpdate }
  var lastAlert:String?
  override func alert(_ text:String) { lastAlert=text }
  override func applicationDidFinishLaunching(_ n:Notification) {
@@ -20,6 +24,15 @@ class SmokeApp:MinerApp {
   super.applicationDidFinishLaunching(n)
   precondition(self.statusItem.menu?.items.first?.title.contains("LTC")==true,"Shared menu must begin with a currency submenu, not the old top-level summary")
   showSettings()
+  blockForUpdate=true
+  let beforeUpdateError=formError.stringValue
+  startMining()
+  precondition(formError.stringValue==beforeUpdateError && !enabled,"An installing update must block Start before changing mining or prompting for a wallet")
+  beginBoost(minutes:15)
+  precondition(formError.stringValue==beforeUpdateError && boost==nil,"An installing update must block Boost")
+  let benchmark=NSMenuItem();benchmark.tag=1;startBenchmark(benchmark)
+  precondition(benchmarkDeadline==nil,"An installing update must block benchmark launches")
+  blockForUpdate=false
   let login=loginManager as! FakeLoginItem
   precondition(loginItem.state == .off && loginCheck.state == .off && !loginMiningCheck.isEnabled && loginMiningCheck.state == .off,"Login mining must default off and require parent login")
   NSApp.sendAction(loginItem.action!,to:loginItem.target,from:loginItem)

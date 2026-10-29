@@ -7,6 +7,8 @@ import Darwin
  func openSystemSettings() {}
 }
 @MainActor final class FixtureApp:MinerApp {
+ // Controller tests use a healthy fixture environment; production keeps real safety sensors.
+ override func environmentSample()->Environment { Environment() }
  var monitor:Timer?
  var started=false
  override var statisticsNetworkingEnabled:Bool { false }

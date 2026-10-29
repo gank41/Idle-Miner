@@ -25,8 +25,8 @@ app.QMessageBox.warning=lambda *args:messages.append(args[-1])
 app.check_async=lambda callback:requests.append(callback)
 b.enabled=True;b.check_updates();assert b.update_busy and len(requests)==1 and b.enabled
 b.check_updates();assert 'already in progress' in messages[-1]
-requests[0]({'manifest':None,'error':'Offline fixture'});assert not b.update_busy and b.enabled and messages[-1]=='Offline fixture'
-b.check_updates();assert 'wait a moment' in messages[-1] and len(requests)==1
+requests[0]({'manifest':None,'error':'Offline fixture'});assert not b.update_busy and b.enabled and b.update_status.text()=='Offline fixture'
+b.update_dialog.close();b.check_updates();assert 'wait a moment' in messages[-1] and len(requests)==1
 b.enabled=False
 # A missing coin never redirects Open to a differently selected named profile.
 b.switch_currency('ETH');b.tick();spawned=[];original_popen=app.subprocess.Popen

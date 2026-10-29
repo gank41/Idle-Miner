@@ -6,31 +6,31 @@ A public **Receive address** tells the provider where to send a payout. Idle Min
 
 ## Download
 
-Get the current packages from the [Idle Miner website](https://idleminer.app/#downloads). For version **1.8 (build 11)**, choose:
+Get the current packages from the [Idle Miner website](https://idleminer.app/#downloads). For version **1.9 (build 12)**, choose:
 
 | Computer | Download |
 | --- | --- |
-| Apple Silicon Mac, macOS 14 or later | `Idle-Miner-1.8-macOS.dmg` |
-| Supported 64-bit ARM or x86 Linux desktop | `Idle-Miner-1.8-Linux.tar.gz` |
+| Apple Silicon Mac, macOS 14 or later | `Idle-Miner-1.9-macOS.dmg` |
+| Supported 64-bit ARM or x86 Linux desktop | `Idle-Miner-1.9-Linux.tar.gz` |
 
-The Linux download is a source installer that builds the engine on your computer. It needs Python/PySide6, Qt 6, KDE Frameworks 6 development packages, and compiler dependencies from your distribution repositories. Fedora, Fedora Asahi, and recent Ubuntu/Debian-family systems are supported by the installer; older releases may lack the required packages. Native Asahi operation has not been verified. See the [release notes](docs/releases/v1.8.md) for testing details.
+The Linux download is a source installer that builds the engine on your computer. It needs Python/PySide6, Qt 6, KDE Frameworks 6 development packages, and compiler dependencies from your distribution repositories. Fedora, Fedora Asahi, and recent Ubuntu/Debian-family systems are supported by the installer; older releases may lack the required packages. Native Asahi operation has not been verified. See the [release notes](docs/releases/v1.9.md) for testing details.
 
 ## Install on a Mac
 
 1. If updating, select **Stop** and **Quit** in **every** Idle Miner currency instance before replacing the app.
-2. Open `Idle-Miner-1.8-macOS.dmg`.
+2. Open `Idle-Miner-1.9-macOS.dmg`.
 3. Drag **Idle Miner** into **Applications**. Replace the previous copy if updating.
 4. Eject the mounted disk and open **Idle Miner** from Applications.
 
 Existing wallets and settings remain in your user account. The app normally opens stopped. Open any additional currency instances again and start them when ready.
 
-This build is locally **ad-hoc signed**, and **has not been notarized by Apple**. macOS may block the first launch because it cannot verify the developer or check the app for malicious software. Only proceed if you trust the source and the downloaded app. After trying to open it, Apple's documented process is **System Settings → Privacy & Security → Open Anyway**, then confirm **Open** if that option is available. Read [Apple's instructions and warnings](https://support.apple.com/en-us/102445) first. A warning that the app is damaged or will harm your computer requires investigation before opening it.
+This Mac release is **Developer ID signed** with hardened runtime. Check the [1.9 release notes](docs/releases/v1.9.md) for Apple notarization status; Developer ID signing by itself does not mean Apple has notarized the download. If macOS blocks first launch, only proceed if you trust the source and downloaded app. After trying to open it, Apple's documented process is **System Settings → Privacy & Security → Open Anyway**, then confirm **Open** if available. Read [Apple's instructions and warnings](https://support.apple.com/en-us/102445) first. A warning that the app is damaged or will harm your computer requires investigation before opening it.
 
 ## Install on Linux
 
 1. If updating, stop mining and quit **all** Idle Miner windows/profiles.
-2. Extract `Idle-Miner-1.8-Linux.tar.gz`.
-3. Open Terminal in the extracted `Idle-Miner-1.8-Linux` folder.
+2. Extract `Idle-Miner-1.9-Linux.tar.gz`.
+3. Open Terminal in the extracted `Idle-Miner-1.9-Linux` folder.
 4. Run:
 
    ```sh
@@ -112,9 +112,15 @@ All started profiles share your configured CPU limit and retain the usual safety
 
 ## Check for updates
 
-Choose **Check for Updates…** from the app menu. Idle Miner checks the version information at `https://idleminer.app/updates/stable.json` only when you request it. If a newer release is available, you can read its release notes and download the installer for your platform. The update check and download do not send your wallet addresses.
+Choose **Check for Updates…** from the app menu. A check runs only when you request it. The update window shows your installed version, the latest version, and release notes inside the app. Choose **Close** to keep using your current version, or **Download and Install Now** to install the offered update. Neither checks nor downloads send wallet addresses, balances, logs, or settings.
 
-The app does not replace itself or install an update automatically. Stop mining and quit every currency instance, then install the downloaded package using the Mac or Linux steps above. Your saved wallets and settings remain in your user account. You can also download the current release from [idleminer.app](https://idleminer.app/#downloads).
+Mac uses Sparkle to verify the signed update feed. Choosing **Download and Install Now** authorizes interruption: before downloading, the updater stops matching currency instances and waits for their mining engines, keeping those engines stopped throughout the update. It verifies the downloaded disk image before extraction, replaces that actual app location, and reopens stopped. Choosing **Close** before installation leaves mining unchanged; canceling after choosing installation leaves mining stopped. If the app location needs administrator access, macOS may show Sparkle's standard authorization prompt. Canceling authorization leaves your installed copy in place. You do not need to move an existing copy to Applications to update it.
+
+Linux verifies the signed manifest and archive, then builds and checks the replacement in a staging directory before stopping your current instances. Installation replaces the existing application directory and keeps your existing launcher. A failed replacement restores the previous directory. The updater never runs a hidden sudo command; if dependencies or directory permissions prevent the update, it explains the problem and leaves the existing copy available. Resolve missing distribution dependencies through your normal package manager, or use the manual installer steps above. After a successful update, Idle Miner reopens stopped.
+
+Saved wallets and settings remain in your user account. There are no automatic background update checks or unattended installations. Update signatures authenticate publisher-provided bytes; they are separate from Apple's Developer ID and notarization checks.
+
+**Updating from 1.8 or earlier:** install version 1.9 once using the manual Mac or Linux steps above. Those older versions can offer a download but cannot perform this built-in installation. Subsequent compatible updates can use **Download and Install Now**. Manual packages remain available from [idleminer.app](https://idleminer.app/#downloads).
 
 ## Keep or remove your settings
 

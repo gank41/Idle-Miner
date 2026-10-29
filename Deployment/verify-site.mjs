@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+import { readFile } from 'node:fs/promises';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { inspectRelease, publicKey, validateManifest, verifySignature, verifyAppcastManifest, verifyArchives } from './update-feed-lib.mjs';
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+if (process.argv.length !== 3) throw new Error('Usage: node verify-site.mjs STAGING_DIRECTORY');
+const stage = resolve(process.argv[2]);
+const key = publicKey(await readFile(join(root, 'Linux/update_public_key.txt'), 'utf8'));
+const bytes = await readFile(join(stage, 'updates/stable.json'));
+if (bytes.length > 65536) throw new Error('Oversized release manifest.');
+verifySignature(bytes, await readFile(join(stage, 'updates/stable.json.sig'), 'utf8'), key, 'staged stable.json');
+const manifest = JSON.parse(bytes.toString('utf8'));
+validateManifest(manifest);
+verifyArchives(manifest, await inspectRelease(join(stage, 'downloads', 'v' + manifest.version), manifest.version), key);
+const appcast = await readFile(join(stage, 'updates/appcast.xml'));
+if (appcast.length > 65536) throw new Error('Oversized appcast.');
+verifyAppcastManifest(appcast, key, manifest);
+if (manifest.build > 11) await inspectRelease(join(stage, 'downloads/v1.8'), '1.8');
+console.log(`Verified signed staging: ${manifest.version} (build ${manifest.build}).`);

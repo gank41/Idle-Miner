@@ -57,9 +57,12 @@ import AppKit
  var localStats=LocalMiningStats()
  var lastHealthLevel:MiningHealth.Level?
  let statsService=StatsService()
+ lazy var builtInUpdater=BuiltInUpdater(app:self)
+ var updateBlocksMining:Bool { builtInUpdater.isPreparingToInstall }
  let updateService=UpdateService()
  var updateCheckTask:Task<Void,Never>?
  var statsWindow:StatsWindow?
+ func environmentSample()->Environment { sensors.sample() }
  var engineResources:URL { Bundle.main.resourceURL! }
  var statisticsNetworkingEnabled:Bool { Bundle.main.bundleIdentifier=="local.jeff.idleminer" }
  let priceItem=NSMenuItem(title:"Coin price · loading…",action:nil,keyEquivalent:"")
@@ -195,6 +198,7 @@ import AppKit
   let item=NSMenuItem(title:title,action:action,keyEquivalent:key); item.target=self; menu.addItem(item); return item
  }
  @objc func startMining() {
+  guard !updateBlocksMining else { return }
   guard !engine.running else { return }
   guard Wallet.valid(settings.address,coin:settings.coin) else { showSettings(); formError.stringValue="Paste your public \(settings.coin) Receive address, then save."; return }
   guard coordinator?.claimCoin(settings.coin) != false else { alert("Another Idle Miner instance is already mining \(settings.coin). Stop it or select a different currency.");return }
@@ -203,6 +207,7 @@ import AppKit
  }
  @objc func startBoost(_ sender:NSMenuItem) { beginBoost(minutes:sender.tag) }
  func beginBoost(minutes:Int) {
+  guard !updateBlocksMining else { return }
   guard let session=TimedBoost(minutes:minutes,now:BoostClock.now) else { return }
   guard benchmarkDeadline==nil else { alert("Stop the offline benchmark before starting Boost."); return }
   guard Wallet.valid(settings.address,coin:settings.coin) else { showSettings(); formError.stringValue="Save your public receive address before starting Boost."; return }
@@ -218,8 +223,9 @@ import AppKit
   if !engine.running { coordinator?.releaseCoin() };tick()
  }
  @objc func startBenchmark(_ sender:NSMenuItem) {
+  guard !updateBlocksMining else { return }
   guard !engine.running else { alert("Stop the current mining session before starting a benchmark."); return }
-  let e=sensors.sample()
+  let e=environmentSample()
   guard e.onAC && e.thermal<2 && !e.memoryPressure && !e.sleeping else { alert(Policy.pauseReason(e)); return }
   sessionClock.begin();localStats.reset(); enabled=false; boost=nil; fatalError=nil; accepted=0; rate="—"
   benchmarkThreads=min(sender.tag,max(1,e.cores-2)); benchmarkDeadline=Date().addingTimeInterval(70)
@@ -233,7 +239,8 @@ import AppKit
   sessionClock.sample(hashing:engine.ready && !engine.isStopping && !engine.isChanging && (localStats.currentRate() ?? 0)>0)
   if statisticsNetworkingEnabled { statsService.refresh(coin:settings.coin,address:settings.address) }
   defer { updateStatistics() }
-  let e=sensors.sample()
+  if updateBlocksMining { desiredThreads=0;engine.stop();return }
+  let e=environmentSample()
   desiredThreads=0
   let now=BoostClock.now
   if let session=boost, !session.isActive(at:now) { boost=nil }
@@ -325,8 +332,8 @@ import AppKit
     if secondary { field.textColor = .secondaryLabelColor }
     stack.addArrangedSubview(field); field.widthAnchor.constraint(equalTo:stack.widthAnchor).isActive=true
    }
-   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.8"
-   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "11"
+   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.9"
+   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "12"
    centered("Idle Miner",size:24,bold:true)
    centered("By Jeffry Zander",size:14)
    centered("Version \(version) (\(build))",secondary:true)

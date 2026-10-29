@@ -1,4 +1,4 @@
-IDLE MINER 1.8 (BUILD 11) FOR LINUX
+IDLE MINER 1.9 (BUILD 12) FOR LINUX
 By Jeffry Zander
 
 INSTALL
@@ -80,12 +80,25 @@ The offline test uses
 one thread for up to 70 seconds, connects to no pool and earns nothing.
 
 UPDATES
-Check for Updates reads the HTTPS stable manifest at
-https://idleminer.app/updates/stable.json only when requested. It compares
-version and build numbers and offers the Linux installer or release notes
-in your browser. It never installs automatically or stops mining. Offline
-or unavailable checks show a retry message; checks are limited to one
-every 30 seconds. Quit every currency before running a downloaded installer.
+Check for Updates shows the installed and latest versions with the latest
+release notes in the window. Download and Install Now downloads and verifies
+the signed release, then prepares a native Linux build in a private folder.
+This can take several minutes. Close cancels preparation. If development
+packages are missing, it explains how to install them in a terminal while
+leaving the current app running; the updater never asks for hidden sudo.
+
+After preparation, all currencies stop and quit gracefully. The updater waits
+for every mining supervisor to finish, replaces the app in its existing folder,
+and reopens stopped. Choose Start when ready to mine again. Wallets, settings,
+logs, desktop entries, and login preferences stay in place. The previous app
+folder is retained beside the installation for recovery; a failed replacement
+restores it. A busy app or engine prevents replacement.
+
+Update checks contact https://idleminer.app/updates/stable.json and its
+Ed25519 signature only when requested, at most once every 30 seconds. The
+release signature, exact archive length, and SHA-256 checksum are verified
+before any downloaded installer code runs. Release notes display as plain
+text. Unsigned, modified, and older releases cannot be installed.
 
 LINUX / ASAHI / VM NOTES
 Uses GNOME Mutter idle monitoring or KDE KIdleTime. KDE detection stays

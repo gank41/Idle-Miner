@@ -5,17 +5,23 @@ if [[ $(uname -s) != Linux || ! -f /etc/os-release ]]; then echo 'Run this insta
 if [[ $EUID == 0 ]]; then echo 'Run as your normal desktop user, not with sudo. The installer asks for sudo only for dependencies.'; exit 1; fi
 if [[ $(uname -m) != aarch64 && $(uname -m) != x86_64 ]]; then echo 'A 64-bit ARM or x86 Linux system is required.'; exit 1; fi
 source /etc/os-release
-printf '%s\n' 'Installing Idle Miner 1.8 (build 11) for this user. Installing never starts mining; login mining requires an explicit Settings opt-in.'
+printf '%s\n' 'Installing Idle Miner 1.9 (build 12) for this user. Installing never starts mining; login mining requires an explicit Settings opt-in.'
 case " $ID ${ID_LIKE:-} " in
  *fedora*)
-  packages=(python3-pyside6 gcc gcc-c++ libstdc++-static cmake make libuv-devel openssl-devel hwloc-devel kf6-kidletime-devel qt6-qtwayland)
-  if ! rpm -q "${packages[@]}" >/dev/null 2>&1; then sudo dnf install -y "${packages[@]}"; fi
+  packages=(openssl python3-pyside6 gcc gcc-c++ libstdc++-static cmake make libuv-devel openssl-devel hwloc-devel kf6-kidletime-devel qt6-qtwayland)
+  if ! rpm -q "${packages[@]}" >/dev/null 2>&1; then
+   if [[ ${IDLE_MINER_UPDATE:-0} == 1 ]]; then echo "Update needs development packages. Run the installer in a terminal to install: ${packages[*]}. Your running app has not changed."; exit 1; fi
+   sudo dnf install -y "${packages[@]}"
+  fi
   ;;
  *ubuntu*|*debian*)
-  packages=(python3-pyside6.qtwidgets python3-pyside6.qtdbus python3-pyside6.qtnetwork build-essential cmake libuv1-dev libssl-dev libhwloc-dev libkf6idletime-dev qt6-wayland)
+  packages=(openssl python3-pyside6.qtwidgets python3-pyside6.qtdbus python3-pyside6.qtnetwork build-essential cmake libuv1-dev libssl-dev libhwloc-dev libkf6idletime-dev qt6-wayland)
   missing=false
   for package in "${packages[@]}"; do [[ $(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null || true) == installed ]] || missing=true; done
-  if $missing; then sudo apt-get update; sudo apt-get install -y "${packages[@]}"; fi
+  if $missing; then
+   if [[ ${IDLE_MINER_UPDATE:-0} == 1 ]]; then echo "Update needs development packages. Run the installer in a terminal to install: ${packages[*]}. Your running app has not changed."; exit 1; fi
+   sudo apt-get update; sudo apt-get install -y "${packages[@]}"
+  fi
   ;;
  *) echo 'Supported distributions: Fedora / Asahi and Ubuntu / Debian family.'; exit 1;;
 esac
@@ -28,8 +34,9 @@ cmake --build "$build_dir/xmrig-build" -j2
 cmake -S idle-helper -B "$build_dir/idle-build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$build_dir/idle-build" -j2
 cc -Wall -Wextra -O2 supervisor.c -o "$build_dir/miner-supervisor"
-IDLE_MINER_SUPERVISOR="$build_dir/miner-supervisor" python3 -m unittest discover -s tests -v
-# Hold the same lock as the app before replacing any installed files.
+env -u IDLE_MINER_STAGE -u IDLE_MINER_UPDATE IDLE_MINER_SUPERVISOR="$build_dir/miner-supervisor" python3 -m unittest discover -s tests -v
+# A built-in update stages privately; the detached helper acquires all leases before the final swap.
 export IDLE_MINER_BUILD="$build_dir"
 python3 install_files.py
+if [[ ${IDLE_MINER_UPDATE:-0} == 1 ]]; then printf '%s\n' 'Prepared the update without changing the current installation.'; exit 0; fi
 printf '\n%s\n' 'Installed. Open Idle Miner from your application launcher, then Settings.' 'You can delete this extracted installer folder; keep the original archive to reinstall.'

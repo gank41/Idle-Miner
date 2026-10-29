@@ -1,5 +1,11 @@
 # Changes
 
+## 1.9 — build 12
+
+**Check for Updates…** now shows installed/latest versions and plain-text release notes inside the app, with **Close** and **Download and Install Now**. Mac uses Sparkle 2.10.1 with signed feeds and archives; Linux verifies the signed manifest and archive and builds a staged replacement before stopping the installed copy. Installation preserves wallet settings and reopens stopped. Checks run only when requested.
+
+Version 1.8 and earlier need one manual install of 1.9 to gain built-in installation. See the [1.9 release notes](docs/releases/v1.9.md) for verification limits.
+
 ## 1.8 — build 11
 
 The website, installers, corresponding source downloads, and update information now live at [idleminer.app](https://idleminer.app/) on Cloudflare Pages. The GitHub repository remains available for source and issues.

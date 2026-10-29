@@ -1,18 +1,18 @@
 # Privacy and network connections
 
-This describes Idle Miner **1.8 (build 11)**. Idle Miner runs locally and does not require an Idle Miner account. The app source contains no developer-operated analytics or telemetry service. Its mining and reporting features contact the third parties below; those services can observe your connection's IP address and the data sent to them.
+This describes Idle Miner **1.9 (build 12)**. Idle Miner runs locally and does not require an Idle Miner account. The app source contains no developer-operated analytics or telemetry service. Its mining and reporting features contact the third parties below; those services can observe your connection's IP address and the data sent to them.
 
 ## Wallet addresses
 
 Idle Miner stores public native-network BTC, LTC, DOGE, and ETH Receive addresses and preferences in your user account. It does not need or store wallet passwords, private keys, or recovery phrases. An ETH `0x` address does not identify its payout network; confirm the provider and wallet networks match. A public address is not a secret key, but sharing it can reveal or link financial activity.
 
-Saving a valid address on Mac allows the app to fetch unMineable statistics automatically, even while mining is stopped. Version 1.8 has no Mac reporting opt-out switch. On Linux, Settings has **Read earnings from unMineable using my public receive address**, enabled by default; turning it off disables those address/account API queries. The Linux price query still runs. Starting mining sends the selected address to the pool regardless of that reporting checkbox. This also applies to mining started by your separate login-mining opt-in.
+Saving a valid address on Mac allows the app to fetch unMineable statistics automatically, even while mining is stopped. Version 1.9 has no Mac reporting opt-out switch. On Linux, Settings has **Read earnings from unMineable using my public receive address**, enabled by default; turning it off disables those address/account API queries. The Linux price query still runs. Starting mining sends the selected address to the pool regardless of that reporting checkbox. This also applies to mining started by your separate login-mining opt-in.
 
 ## Connections
 
 | Service | Purpose and information sent |
 | --- | --- |
-| Idle Miner website, `idleminer.app` (Cloudflare hosting) | Choosing **Check for Updates…** fetches the release version manifest over HTTPS. Requesting an installer or opening release notes also contacts this host. The update request contains no wallet address, balance, mining log, or saved settings. Cloudflare can observe ordinary connection information, including IP address and request headers. Checks are manual; the app does not automatically install updates. |
+| Idle Miner website, `idleminer.app` (Cloudflare hosting) | Choosing **Check for Updates…** fetches the signed release feed over HTTPS (Mac appcast; Linux manifest and detached signature). Selecting **Download and Install Now** downloads the signed platform package from the same host. Release notes appear inside the update window. The update request contains no wallet address, balance, mining log, or saved settings. Cloudflare can observe ordinary connection information, including IP address and request headers. Checks are user-invoked, with no automatic background checks. Installation requires choosing **Download and Install Now**. |
 | Coinbase, `api.coinbase.com` | HTTPS GET requests for the selected currency's USD spot price. The wallet address is not included in this query. |
 | unMineable, `api.unmineable.com` | HTTPS GET requests containing the public Receive address and selected currency, followed by account-statistics requests using the returned account identifier. Mac also requests worker information. |
 | unMineable mining pool, `rx.unmineable.com:443` | TLS-protected Stratum mining connection. The pool login contains the currency, public Receive address, and a worker label (`IdleMiner` on Mac or `IdleMinerLinux` on Linux). The engine sends accepted-work submissions and receives mining jobs. |

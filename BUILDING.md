@@ -61,10 +61,9 @@ the same native/Python controller, supervisor, resources and pinned upstream
 engine source as the downloadable release. Public packages must contain no wallets,
 settings, logs, account balances, developer credentials or private audit records.
 
-Version 1.8 (build 11) adds one shared menu bar/tray icon, a manual **Check for Updates…**
-command, and Cloudflare-hosted releases. Record fresh results in
-[the 1.8 release notes](docs/releases/v1.8.md); earlier release checks do not
-establish coverage for the new build. Native Asahi hardware remains untested.
+Version 1.9 (build 12) adds built-in, user-invoked updates. Mac embeds Sparkle 2.10.1 and requires its matching framework and tools under `Vendor/Sparkle`; retain Sparkle's license in the app. The pinned Ed25519 public key is in `macOS/Info.plist` and `Linux/update_public_key.txt`. Production signing uses the login Keychain account `local.jeff.idleminer.updates`; private key material must never be exported into the repository, a release archive, or a staging directory. Ordinary source builds do not need the private update-signing key.
+
+Record fresh results in [the 1.9 release notes](docs/releases/v1.9.md). Automated fixture checks establish signature rejection and installation policy behavior; they do not establish a successful live published update, administrator authorization, notarization, or native Asahi hardware operation.
 
 ## Website deployment
 

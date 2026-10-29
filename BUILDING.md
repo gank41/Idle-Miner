@@ -61,9 +61,9 @@ the same native/Python controller, supervisor, resources and pinned upstream
 engine source as the downloadable release. Public packages must contain no wallets,
 settings, logs, account balances, developer credentials or private audit records.
 
-Version 1.9.1 (build 13) adds restoration of pre-update currency states to built-in, user-invoked updates. Mac embeds Sparkle 2.10.1 and requires its matching framework and tools under `Vendor/Sparkle`; retain Sparkle's license in the app. The pinned Ed25519 public key is in `macOS/Info.plist` and `Linux/update_public_key.txt`. Production signing uses the login Keychain account `local.jeff.idleminer.updates`; private key material must never be exported into the repository, a release archive, or a staging directory. Ordinary source builds do not need the private update-signing key.
+Version 1.9.2 (build 14) makes current-version update checks compact, with optional release notes. Built-in updates retain the currency restoration added in 1.9.1. Mac embeds Sparkle 2.10.1 and requires its matching framework and tools under `Vendor/Sparkle`; retain Sparkle's license in the app. The pinned Ed25519 public key is in `macOS/Info.plist` and `Linux/update_public_key.txt`. Production signing uses the login Keychain account `local.jeff.idleminer.updates`; private key material must never be exported into the repository, a release archive, or a staging directory. Ordinary source builds do not need the private update-signing key.
 
-Record fresh results in [the 1.9.1 release notes](docs/releases/v1.9.1.md). Automated fixture checks establish signature rejection and installation policy behavior; they do not establish a successful live published update, administrator authorization, notarization, or native Asahi hardware operation.
+Record fresh results in [the 1.9.2 release notes](docs/releases/v1.9.2.md). Automated fixture checks establish signature rejection and installation policy behavior; they do not establish a successful live published update, administrator authorization, notarization, or native Asahi hardware operation.
 
 ## Website deployment
 

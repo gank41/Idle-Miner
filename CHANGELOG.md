@@ -1,5 +1,9 @@
 # Changes
 
+## 1.9.2 — build 14
+
+Up-to-date checks now open a compact window with the installed/latest versions, a short status, and Close. Optional Release Notes expand or collapse on demand. Available updates still show their changes before installation. This applies to Mac and Linux and preserves existing signed installation and currency restoration. See [release notes](docs/releases/v1.9.2.md).
+
 ## 1.9.1 — build 13
 
 Successful built-in updates restore the currencies that were enabled before updating, including automatic mining temporarily paused by idle or safety conditions. Manually stopped currencies stay stopped. Normal limits and safety checks still apply; Boost and offline benchmarks are not restored. Actual sign-ins continue to follow Start at Login and its separate mining checkbox. Ordinary manual openings stay stopped. The state handoff is private, short-lived, bound to the installed location/build and consumed once.

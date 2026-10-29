@@ -1,4 +1,4 @@
-IDLE MINER 1.9.1 (BUILD 13) FOR LINUX
+IDLE MINER 1.9.2 (BUILD 14) FOR LINUX
 By Jeffry Zander
 
 INSTALL
@@ -80,9 +80,12 @@ The offline test uses
 one thread for up to 70 seconds, connects to no pool and earns nothing.
 
 UPDATES
-Check for Updates shows the installed and latest versions with the latest
-release notes in the window. Download and Install Now downloads and verifies
-the signed release, then prepares a native Linux build in a private folder.
+Check for Updates shows the installed and latest versions and status. When
+up to date, optional Release Notes start collapsed; click to expand or hide
+them. Notes stay hidden while checking or after an error. A newer signed
+release shows its notes expanded and offers Download and Install Now. This
+downloads and verifies the signed release, then prepares a native Linux build
+in a private folder.
 This can take several minutes. Close cancels preparation. If development
 packages are missing, it explains how to install them in a terminal while
 leaving the current app running; the updater never asks for hidden sudo.

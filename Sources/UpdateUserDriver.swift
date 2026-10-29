@@ -10,6 +10,13 @@ import Sparkle
  private let versionLabel=NSTextField(wrappingLabelWithString:"")
  private let statusLabel=NSTextField(wrappingLabelWithString:"")
  private let notes=NSTextView()
+ private let notesScroll=NSScrollView()
+ private let notesToggle=NSButton(title:"▸ Release Notes",target:nil,action:nil)
+ private var notesExpanded=false
+ private var layoutExpanded:Bool?
+ private var expandedBottom:NSLayoutConstraint!
+ private var compactBottom:NSLayoutConstraint!
+ private var collapsedNotesHeight:NSLayoutConstraint!
  private let progress=NSProgressIndicator()
  private let installButton=NSButton(title:"Download and Install Now",target:nil,action:nil)
  private let closeButton=NSButton(title:"Close",target:nil,action:nil)
@@ -24,8 +31,8 @@ import Sparkle
  init(installedVersion:String) { state=UpdatePresentationState(installedVersion:installedVersion);super.init() }
  private func ensureWindow() {
   guard updateWindow==nil else { return }
-  let window=NSWindow(contentRect:NSRect(x:0,y:0,width:580,height:450),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
-  window.title="Idle Miner Update";window.minSize=NSSize(width:460,height:340);window.isReleasedWhenClosed=false;window.delegate=self
+  let window=NSWindow(contentRect:NSRect(x:0,y:0,width:580,height:260),styleMask:[.titled,.closable,.resizable],backing:.buffered,defer:false)
+  window.title="Idle Miner Update";window.contentMinSize=NSSize(width:460,height:240);window.isReleasedWhenClosed=false;window.delegate=self
   let content=window.contentView!
   let title=NSTextField(labelWithString:"Idle Miner Update");title.font = .boldSystemFont(ofSize:20)
   versionLabel.font = .systemFont(ofSize:13)
@@ -34,26 +41,59 @@ import Sparkle
   notes.frame=NSRect(x:0,y:0,width:520,height:180);notes.maxSize=NSSize(width:CGFloat.greatestFiniteMagnitude,height:CGFloat.greatestFiniteMagnitude)
   notes.autoresizingMask=[.width];notes.isVerticallyResizable=true;notes.isHorizontallyResizable=false;notes.textContainer?.widthTracksTextView=true
   notes.setAccessibilityIdentifier("update-release-notes")
-  let scroll=NSScrollView();scroll.hasVerticalScroller=true;scroll.borderType = .bezelBorder;scroll.documentView=notes
+  let scroll=notesScroll;scroll.hasVerticalScroller=true;scroll.borderType = .bezelBorder;scroll.documentView=notes
+  notesToggle.target=self;notesToggle.action=#selector(toggleReleaseNotes);notesToggle.bezelStyle = .inline;notesToggle.alignment = .left
+  notesToggle.setAccessibilityIdentifier("update-release-notes-toggle");notesToggle.setAccessibilityLabel("Release Notes")
+  expandedBottom=scroll.bottomAnchor.constraint(equalTo:progress.topAnchor,constant:-16)
+  compactBottom=progress.topAnchor.constraint(equalTo:notesToggle.bottomAnchor,constant:12)
+  collapsedNotesHeight=scroll.heightAnchor.constraint(equalToConstant:0)
   progress.style = .bar;progress.minValue=0;progress.maxValue=1
   installButton.target=self;installButton.action=#selector(installNow);installButton.bezelStyle = .rounded;installButton.setAccessibilityIdentifier("update-install-now")
   closeButton.target=self;closeButton.action=#selector(closeUpdate);closeButton.bezelStyle = .rounded;closeButton.keyEquivalent="\u{1b}"
-  for view in [title,versionLabel,statusLabel,scroll,progress,installButton,closeButton] { view.translatesAutoresizingMaskIntoConstraints=false;content.addSubview(view) }
+  for view in [title,versionLabel,statusLabel,notesToggle,scroll,progress,installButton,closeButton] { view.translatesAutoresizingMaskIntoConstraints=false;content.addSubview(view) }
   NSLayoutConstraint.activate([
    title.leadingAnchor.constraint(equalTo:content.leadingAnchor,constant:22),title.topAnchor.constraint(equalTo:content.topAnchor,constant:20),
    versionLabel.leadingAnchor.constraint(equalTo:title.leadingAnchor),versionLabel.trailingAnchor.constraint(equalTo:content.trailingAnchor,constant:-22),versionLabel.topAnchor.constraint(equalTo:title.bottomAnchor,constant:12),
    statusLabel.leadingAnchor.constraint(equalTo:title.leadingAnchor),statusLabel.trailingAnchor.constraint(equalTo:versionLabel.trailingAnchor),statusLabel.topAnchor.constraint(equalTo:versionLabel.bottomAnchor,constant:12),
-   scroll.leadingAnchor.constraint(equalTo:title.leadingAnchor),scroll.trailingAnchor.constraint(equalTo:versionLabel.trailingAnchor),scroll.topAnchor.constraint(equalTo:statusLabel.bottomAnchor,constant:12),scroll.bottomAnchor.constraint(equalTo:progress.topAnchor,constant:-16),
+   notesToggle.leadingAnchor.constraint(equalTo:title.leadingAnchor),notesToggle.topAnchor.constraint(equalTo:statusLabel.bottomAnchor,constant:12),
+   scroll.leadingAnchor.constraint(equalTo:title.leadingAnchor),scroll.trailingAnchor.constraint(equalTo:versionLabel.trailingAnchor),scroll.topAnchor.constraint(equalTo:notesToggle.bottomAnchor,constant:8),
    progress.leadingAnchor.constraint(equalTo:title.leadingAnchor),progress.trailingAnchor.constraint(equalTo:versionLabel.trailingAnchor),progress.bottomAnchor.constraint(equalTo:closeButton.topAnchor,constant:-18),
    closeButton.trailingAnchor.constraint(equalTo:versionLabel.trailingAnchor),closeButton.bottomAnchor.constraint(equalTo:content.bottomAnchor,constant:-18),
    installButton.trailingAnchor.constraint(equalTo:closeButton.leadingAnchor,constant:-10),installButton.centerYAnchor.constraint(equalTo:closeButton.centerYAnchor)
   ])
   window.center();updateWindow=window
  }
+ @objc private func toggleReleaseNotes() {
+  notesExpanded.toggle();updateNotesLayout()
+ }
+ private func updateNotesLayout() {
+  guard let window=updateWindow else { return }
+  let hasNotes = !notes.string.isEmpty
+  let expanded=hasNotes && notesExpanded
+  notesToggle.isHidden = !hasNotes
+  notesToggle.title=expanded ? "▾ Release Notes":"▸ Release Notes"
+  notesToggle.setAccessibilityValue(expanded ? "Expanded":"Collapsed")
+  notesScroll.isHidden = !expanded
+  // Deactivate the previous layout before activating its replacement.
+  expandedBottom.isActive=false;compactBottom.isActive=false;collapsedNotesHeight.isActive=false
+  if expanded { expandedBottom.isActive=true }
+  else { compactBottom.isActive=true;collapsedNotesHeight.isActive=true }
+  let statusHeight=statusLabel.cell?.cellSize(forBounds:NSRect(x:0,y:0,width:max(1,(window.contentView?.bounds.width ?? 580)-44),height:CGFloat.greatestFiniteMagnitude)).height ?? 20
+  let minimumHeight=max(expanded ? 420:240,ceil(statusHeight)+220+(expanded ? 180:0))
+  window.contentMinSize=NSSize(width:460,height:minimumHeight)
+  guard layoutExpanded != expanded || (window.contentView?.bounds.height ?? 0)<minimumHeight else { return }
+  layoutExpanded=expanded
+  let old=window.frame
+  var frame=window.frameRect(forContentRect:NSRect(x:0,y:0,width:window.contentView?.bounds.width ?? 580,height:max(expanded ? 460:260,minimumHeight)))
+  frame.origin=NSPoint(x:old.minX,y:old.maxY-frame.height)
+  window.setFrame(frame,display:true)
+ }
  private func render(_ status:String) {
   ensureWindow()
   versionLabel.stringValue="Installed: \(state.installedVersion)\nLatest: \(state.latestVersion ?? "Checking…")"
   statusLabel.stringValue=status
+  progress.isHidden = state.phase == .available || state.phase == .finished
+  updateNotesLayout()
   installButton.isHidden=state.installButtonTitle==nil
   let canClose=state.canClose && (state.phase != .downloading || cancellation != nil)
   closeButton.isEnabled=canClose
@@ -86,18 +126,18 @@ import Sparkle
   SUUpdatePermissionResponse(automaticUpdateChecks:false,automaticUpdateDownloading:false,sendSystemProfile:false)
  }
  func showUserInitiatedUpdateCheck(cancellation:@escaping ()->Void) {
-  preserveFailureWindow=false;consented=false;self.cancellation=cancellation
+  preserveFailureWindow=false;consented=false;notesExpanded=false;layoutExpanded=nil;self.cancellation=cancellation
   state.phase = .checking;state.latestVersion=nil;notes.string="";progress.isIndeterminate=true;progress.startAnimation(nil)
   render("Checking for updates…")
  }
  func showUpdateFound(with item:SUAppcastItem,state updateState:SPUUserUpdateState) async->SPUUserUpdateChoice {
-  cancellation=nil;record(item);progress.stopAnimation(nil);progress.isIndeterminate=false;progress.doubleValue=0
+  cancellation=nil;record(item);notesExpanded=true;progress.stopAnimation(nil);progress.isIndeterminate=false;progress.doubleValue=0
   if item.isInformationOnlyUpdate {
    state.phase = .finished;render("This release cannot be installed on this Mac.")
    await waitForAcknowledgement();return .dismiss
   }
   state.phase = .available;closeChoice=updateState.stage == .installing ? .skip:.dismiss
-  render("Read the changes below. Installing will stop mining in all windows, update this copy of Idle Miner, and restore the currencies that were open. Previously enabled mining resumes in Automatic mode with the usual safety protections.")
+  render("An update is available. Installing pauses mining and updates this copy of Idle Miner.")
   let result=await withCheckedContinuation { choice=$0 }
   if result == .install { return await prepareInstallation(installing:updateState.stage == .installing) }
   return result
@@ -110,15 +150,20 @@ import Sparkle
   if notes.string.isEmpty { notes.string="Release notes could not be loaded." }
  }
  func showUpdateNotFoundWithError(_ error:Error) async {
-  cancellation=nil;progress.stopAnimation(nil);state.phase = .finished
+  cancellation=nil;notesExpanded=false;progress.stopAnimation(nil);state.phase = .finished
   if let item=(error as NSError).userInfo[SPULatestAppcastItemFoundKey] as? SUAppcastItem { record(item) }
   if state.latestVersion==nil { state.latestVersion="Unavailable" }
-  render(error.localizedDescription)
+  let reason=((error as NSError).userInfo[SPUNoUpdateFoundReasonKey] as? NSNumber)?.intValue
+  let message:String
+  if reason==Int(SPUNoUpdateFoundReason.onLatestVersion.rawValue) { message="Idle Miner is up to date." }
+  else if reason==Int(SPUNoUpdateFoundReason.onNewerThanLatestVersion.rawValue) { message="You’re running a newer version than the latest release." }
+  else { message=error.localizedDescription }
+  render(message)
   await waitForAcknowledgement()
  }
  func showUpdaterError(_ error:Error) async {
   installationFailed?()
-  cancellation=nil;progress.stopAnimation(nil);state.phase = .finished
+  cancellation=nil;notesExpanded=false;progress.stopAnimation(nil);state.phase = .finished
   render("The update could not be completed. Your current app and preferences remain available.\n\n\(error.localizedDescription)")
   await waitForAcknowledgement()
  }

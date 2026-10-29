@@ -4,7 +4,7 @@ import os,sys,json,signal,fcntl,shutil,uuid,time,subprocess,threading,tempfile
 from pathlib import Path
 from PySide6.QtCore import Qt,QTimer,QProcess,QUrl,QPointF,QDateTime,QLocale,QObject,Signal
 from PySide6.QtGui import QIcon,QPixmap,QPainter,QPen,QColor,QFont,QDesktopServices,QAction
-from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QMenu,QSystemTrayIcon,QDialog,QFormLayout,QLineEdit,QComboBox,QCheckBox,QDialogButtonBox,QMessageBox,QPlainTextEdit,QTabWidget,QWidgetAction,QScrollArea)
+from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QToolButton,QMenu,QSystemTrayIcon,QDialog,QFormLayout,QLineEdit,QComboBox,QCheckBox,QDialogButtonBox,QMessageBox,QPlainTextEdit,QTabWidget,QWidgetAction,QScrollArea)
 from core import VERSION,BUILD,DEFAULTS,COINS,DURATIONS,Work,SessionClock,duration,now,validated,valid_wallet,threads,config
 from coordination import SettingsStore,Coordinator,atomic
 from startup import startup_plan,autostart_enabled,login_entry,save_login_preference
@@ -336,35 +336,46 @@ class Window(QMainWindow):
   if self.update_dialog and self.update_dialog.isVisible():self.update_dialog.raise_();return
   if now()-self.update_last<30:QMessageBox.information(self,'Check for Updates','Please wait a moment before checking again.');return
   self.update_cancel=threading.Event();self.update_release=None
-  dialog=QDialog(self);dialog.setWindowTitle('Check for Updates');dialog.resize(600,440);layout=QVBoxLayout(dialog)
+  dialog=QDialog(self);dialog.setWindowTitle('Check for Updates');dialog.setMinimumWidth(520);layout=QVBoxLayout(dialog)
   self.update_versions=QLabel(f'Installed: Idle Miner {VERSION} ({BUILD})\nLatest: checking…');layout.addWidget(self.update_versions)
   self.update_status=QLabel('Checking for updates…');self.update_status.setTextFormat(Qt.TextFormat.PlainText);self.update_status.setWordWrap(True);layout.addWidget(self.update_status)
-  label=QLabel('Latest release notes');layout.addWidget(label)
-  self.update_notes=QPlainTextEdit();self.update_notes.setReadOnly(True);self.update_notes.setPlainText('Checking for release notes…');layout.addWidget(self.update_notes)
+  self.update_notes_toggle=QToolButton();self.update_notes_toggle.setText('Release Notes');self.update_notes_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon);self.update_notes_toggle.setCheckable(True);self.update_notes_toggle.setArrowType(Qt.ArrowType.RightArrow);self.update_notes_toggle.toggled.connect(self.toggle_update_notes);layout.addWidget(self.update_notes_toggle);self.update_notes_toggle.hide()
+  self.update_notes=QPlainTextEdit();self.update_notes.setReadOnly(True);layout.addWidget(self.update_notes);self.update_notes.hide()
   row=QHBoxLayout();row.addStretch();close=QPushButton('Close');close.clicked.connect(dialog.reject);row.addWidget(close)
-  self.update_install=QPushButton('Download and Install Now');self.update_install.setEnabled(False);self.update_install.clicked.connect(self.install_update);row.addWidget(self.update_install);layout.addLayout(row)
-  dialog.finished.connect(lambda _:self.update_cancel.set());self.update_dialog=dialog;dialog.show()
+  self.update_install=QPushButton('Download and Install Now');self.update_install.setEnabled(False);self.update_install.hide();self.update_install.clicked.connect(self.install_update);row.addWidget(self.update_install);layout.addLayout(row)
+  dialog.finished.connect(lambda _:self.update_cancel.set());self.update_dialog=dialog;dialog.adjustSize();dialog.show()
   self.update_busy=True;self.update_last=now();check_async(self.update_bridge.ready.emit)
+ def toggle_update_notes(self,expanded):
+  self.update_notes.setVisible(expanded)
+  self.update_notes_toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
+  self.update_dialog.adjustSize()
  def update_result(self,result):
   self.update_busy=False
   if self.quitting or self.update_dialog is None:return
-  self.update_install.setEnabled(False)
+  self.update_release=None;self.update_install.setEnabled(False);self.update_install.hide()
+  self.update_notes_toggle.setChecked(False);self.update_notes_toggle.hide();self.update_notes.hide();self.update_notes.clear()
+  self.update_dialog.adjustSize()
   if result['error']:
-   self.update_versions.setText(f'Installed: Idle Miner {VERSION} ({BUILD})\nLatest: unavailable');self.update_status.setText(result['error']);self.update_notes.setPlainText('Release notes are unavailable.');return
-  release=result['manifest'];self.update_release=release
+   self.update_versions.setText(f'Installed: Idle Miner {VERSION} ({BUILD})\nLatest: unavailable');self.update_status.setText(result['error']);self.update_dialog.adjustSize();return
+  release=result['manifest']
   self.update_versions.setText(f"Installed: Idle Miner {VERSION} ({BUILD})\nLatest: Idle Miner {release['version']} ({release['build']})")
   self.update_notes.setPlainText(release['releaseNotesText'])
-  if not newer(release['version'],release['build'],VERSION,BUILD):self.update_status.setText('Idle Miner is up to date.');return
+  has_notes=bool(release['releaseNotesText'].strip())
+  if not newer(release['version'],release['build'],VERSION,BUILD):
+   self.update_status.setText('Idle Miner is up to date.');self.update_notes_toggle.setVisible(has_notes);self.update_dialog.adjustSize();return
   try:install_metadata(release)
-  except ValueError as exc:self.update_status.setText(str(exc));return
-  self.update_status.setText('The update will install in this app’s current location. Settings and wallets are kept. All currencies will quit after preparation. Previously enabled currencies will resume using their automatic mining settings; stopped currencies stay stopped.');self.update_install.setEnabled(True)
+  except ValueError as exc:self.update_status.setText(str(exc));self.update_dialog.adjustSize();return
+  self.update_release=release
+  self.update_status.setText('Installs here and keeps settings and wallets. Open currencies restart in their prior enabled or stopped state.')
+  self.update_install.show();self.update_install.setEnabled(True);self.update_notes_toggle.setVisible(has_notes);self.update_notes_toggle.setChecked(has_notes);self.update_dialog.adjustSize()
  def update_progress(self,text):
   if self.update_dialog:self.update_status.setText(text)
  def update_failed(self,message):
   self.update_preparing=False
   if self.quitting:return
   self.update_progress(message)
-  if self.update_dialog and self.update_dialog.isVisible():self.update_install.setEnabled(bool(self.update_release))
+  if self.update_dialog and self.update_dialog.isVisible():
+   self.update_notes_toggle.setChecked(False);self.update_notes_toggle.hide();self.update_notes.hide();self.update_install.setEnabled(bool(self.update_release));self.update_dialog.adjustSize()
  def install_update(self):
   if self.update_preparing or not self.update_release:return
   self.update_preparing=True;self.update_install.setEnabled(False);release=dict(self.update_release);cancel=self.update_cancel

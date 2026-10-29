@@ -246,22 +246,181 @@ def replace_install(stage,root,state,timeout=25):
  finally:
   if candidate.exists():shutil.rmtree(candidate)
 
-def request_shutdown(tray,targets):
+# Update handoffs live outside the install and settings. Display summaries are
+# deliberately not authority for enabled state: each process acknowledges at
+# the instant it handles the update quit command, before stopping its engine.
+RESUME_TTL=120
+RESUME_COINS=('BTC','LTC','DOGE','ETH')
+
+def valid_token(token):return isinstance(token,str) and re.fullmatch('[a-f0-9]{32}',token) is not None
+
+def private_directory(path):
+ path=Path(path);path.mkdir(parents=True,exist_ok=True,mode=0o700);info=path.lstat()
+ if not stat.S_ISDIR(info.st_mode) or info.st_uid!=os.getuid() or info.st_mode&0o077:raise ValueError('Unsafe update handoff directory')
+ return path
+
+def read_private(path):
+ fd=os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0))
+ with os.fdopen(fd,'rb') as stream:
+  info=os.fstat(stream.fileno())
+  if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or info.st_mode&0o077 or info.st_size>MAX_BYTES:raise ValueError('Unsafe update handoff file')
+  raw=stream.read(MAX_BYTES+1)
+  if len(raw)>MAX_BYTES:raise ValueError('Update handoff too large')
+  data=json.loads(raw)
+  if not isinstance(data,dict):raise ValueError('Invalid update handoff')
+  return data
+
+def write_private(path,data):
+ path=Path(path);raw=json.dumps(data,ensure_ascii=True).encode('ascii')
+ if len(raw)>MAX_BYTES:raise ValueError('Update handoff too large')
+ temporary=path.with_name('.'+path.name+'.'+uuid.uuid4().hex)
+ fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+ try:
+  with os.fdopen(fd,'wb') as stream:stream.write(raw)
+  temporary.replace(path)
+ finally:temporary.unlink(missing_ok=True)
+
+def resume_directory(state,token):
+ if not valid_token(token):raise ValueError('Invalid update handoff token')
+ parent=private_directory(Path(state)/'update-handoffs-v1')
+ return private_directory(parent/token)
+
+def receipt_path(state,token):
+ if not valid_token(token):raise ValueError('Invalid update handoff token')
+ return private_directory(Path(state)/'update-handoffs-v1')/(token+'.receipt.json')
+
+def valid_rows(rows,acknowledged=False):
+ if not isinstance(rows,list) or not 1<=len(rows)<=len(PROFILES):return False
+ seen=set()
+ for row in rows:
+  if not isinstance(row,dict) or row.get('profile') not in PROFILES or row['profile'] in seen or row.get('coin') not in RESUME_COINS:return False
+  if type(row.get('pid')) is not int or row['pid']<=0 or not valid_token(row.get('nonce')):return False
+  if acknowledged and type(row.get('enabled')) is not bool:return False
+  seen.add(row['profile'])
+ return True
+
+def validate_resume(data,root,token,acknowledged=False):
+ if type(data.get('schema')) is not int or data['schema']!=1 or data.get('token')!=token or not valid_token(token):raise ValueError('Invalid update handoff')
+ created=data.get('created')
+ if type(created) not in (int,float) or not 0<=time.time()-created<=RESUME_TTL:raise ValueError('Update handoff expired')
+ if data.get('root')!=str(Path(root).resolve()):raise ValueError('Update handoff belongs to another installation')
+ for key in ('sourceBuild','targetBuild'):
+  if type(data.get(key)) is not int or not 0<data[key]<2**31:raise ValueError('Invalid update build')
+ if not newer(data.get('targetVersion'),data['targetBuild'],data.get('sourceVersion'),data['sourceBuild']):raise ValueError('Update handoff is not a newer release')
+ if not valid_rows(data.get('targets'),acknowledged) or data.get('launcher') not in [r['profile'] for r in data['targets']]:raise ValueError('Invalid update currencies')
+ return data
+
+def begin_resume(state,root,source_version,source_build,target_version,target_build,targets,launcher):
+ token=uuid.uuid4().hex
+ rows=[{key:row[key] for key in ('profile','coin','pid','nonce')} for row in targets]
+ request=dict(schema=1,token=token,root=str(Path(root).resolve()),created=time.time(),sourceVersion=source_version,sourceBuild=source_build,targetVersion=target_version,targetBuild=target_build,targets=rows,launcher=launcher)
+ validate_resume(request,root,token)
+ if installed_version(root)!=(source_version,source_build):raise ValueError('The installed app changed. Check for updates again.')
+ write_private(resume_directory(state,token)/'request.json',request)
+ return token
+
+def acknowledge_resume(state,root,token,profile,pid,nonce,coin,enabled):
+ try:
+  directory=resume_directory(state,token);request=validate_resume(read_private(directory/'request.json'),root,token)
+  if installed_version(root)!=(request['sourceVersion'],request['sourceBuild']):return False
+  if type(pid) is not int or type(enabled) is not bool or coin not in RESUME_COINS:return False
+  target=next((r for r in request['targets'] if r['profile']==profile and r['pid']==pid and r['nonce']==nonce),None)
+  if target is None:return False
+  row=dict(profile=profile,pid=pid,nonce=nonce,coin=coin,enabled=enabled)
+  # The first hook owns the decision; later Stop/Quit activity cannot rewrite it.
+  path=directory/(profile+'.json');temporary=directory/('.ack-'+uuid.uuid4().hex)
+  try:
+   write_private(temporary,row);os.link(temporary,path,follow_symlinks=False)
+  finally:temporary.unlink(missing_ok=True)
+  return True
+ except (OSError,ValueError,TypeError,KeyError,StopIteration):return False
+
+def finalize_resume(state,root,token,timeout=10):
+ directory=resume_directory(state,token);request=validate_resume(read_private(directory/'request.json'),root,token);deadline=time.monotonic()+timeout
+ while True:
+  rows=[]
+  try:
+   for target in request['targets']:
+    row=read_private(directory/(target['profile']+'.json'))
+    if not valid_rows([row],True) or any(row[key]!=target[key] for key in ('profile','pid','nonce')):raise ValueError('Invalid currency acknowledgement')
+    rows.append(row)
+   return validate_resume(dict(request,targets=rows),root,token,True)
+  except FileNotFoundError:
+   if time.monotonic()>=deadline:raise ValueError('A currency did not acknowledge update shutdown. No update was installed.')
+   time.sleep(.05)
+
+def publish_resume(state,root,plan):
+ plan=validate_resume(plan,root,plan.get('token'),True)
+ if installed_version(root)!=(plan['targetVersion'],plan['targetBuild']):raise ValueError('The installed update does not match the resume receipt')
+ receipt=dict(plan,created=time.time(),remaining=[r['profile'] for r in plan['targets']],peersLaunched=False)
+ write_private(receipt_path(state,plan['token']),receipt)
+ return receipt
+
+def consume_resume(state,root,token,profile,version,build):
+ """Consume each profile once under a stable lock; launcher opens exact peers."""
+ if not valid_token(token) or profile not in PROFILES:return None
+ try:
+  path=receipt_path(state,token);lock_path=path.with_suffix('.lock')
+  fd=os.open(lock_path,os.O_RDWR|os.O_CREAT|getattr(os,'O_NOFOLLOW',0),0o600)
+  with os.fdopen(fd,'a') as lock:
+   info=os.fstat(lock.fileno())
+   if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.getuid() or info.st_mode&0o077:return None
+   fcntl.flock(lock,fcntl.LOCK_EX)
+   data=validate_resume(read_private(path),root,token,True)
+   if (version,build)!=(data['targetVersion'],data['targetBuild']) or installed_version(root)!=(version,build):return None
+   remaining=data.get('remaining')
+   expected={r['profile'] for r in data['targets']}
+   if not isinstance(remaining,list) or len(set(remaining))!=len(remaining) or any(p not in expected for p in remaining) or profile not in remaining or type(data.get('peersLaunched')) is not bool:return None
+   row=next(r for r in data['targets'] if r['profile']==profile)
+   peers=[]
+   if profile==data['launcher'] and not data['peersLaunched']:
+    peers=[{key:r[key] for key in ('profile','coin','enabled')} for r in data['targets'] if r['profile']!=profile and r['profile'] in remaining];data['peersLaunched']=True
+   data['remaining'].remove(profile)
+   if data['remaining']:write_private(path,data)
+   else:path.unlink()
+   return dict(coin=row['coin'],enabled=row['enabled'],peers=peers)
+ except (OSError,ValueError,TypeError,KeyError,StopIteration):return None
+
+def discard_resume(state,token):
+ if not valid_token(token):return
+ try:receipt_path(state,token).unlink(missing_ok=True);shutil.rmtree(resume_directory(state,token),ignore_errors=True)
+ except (OSError,ValueError):pass
+
+
+def request_shutdown(tray,targets,token=None):
+ if token is not None:
+  if not valid_token(token):raise ValueError('Invalid update handoff token')
+  for row in targets:
+   if not tray.send(row,'quit-update:'+token):raise ValueError('A currency could not receive update shutdown. Wait a moment and try again.')
+  return
  for row in targets:
   if not tray.send(row,'stop'):raise ValueError('A currency could not receive Stop. Wait a moment and try again.')
  for row in targets:
   if not tray.send(row,'quit'):raise ValueError('A currency could not receive Quit. Wait a moment and try again.')
 
-def helper_main(stage,root,state,workspace):
+def helper_main(stage,root,state,workspace,token=None):
  """Detached helper remains available while installed files are replaced."""
- message='Updated successfully. Mining is stopped; choose Start when you are ready.'
- try:replace_install(stage,root,state)
- except Exception as exc:message='The update was not installed. '+str(exc)
+ message='Updated successfully. Mining is stopped; choose Start when you are ready.';resume=None
+ try:
+  plan=finalize_resume(state,root,token) if token is not None else None
+  if plan is not None and installed_version(stage)!=(plan['targetVersion'],plan['targetBuild']):raise ValueError('Prepared update does not match the resume handoff')
+  replace_install(stage,root,state)
+  if plan is not None:
+   publish_resume(state,root,plan);resume=plan
+   message='Updated successfully. Previously enabled currencies have resumed their automatic mining settings. Stopped currencies remain stopped.'
+ except Exception as exc:
+  discard_resume(state,token);message='The update was not installed or could not resume automatically. '+str(exc)
  state=Path(state);result=state/'update-result.json'
  try:
-  temporary=result.with_suffix('.tmp');temporary.write_text(json.dumps({'message':message}));temporary.chmod(0o600);temporary.replace(result)
-  # Plain startup never resumes mining, even when login mining is enabled.
-  subprocess.Popen([sys.executable,str(Path(root)/'app.py'),'--update-result'],cwd=root,start_new_session=True,close_fds=True)
- finally:shutil.rmtree(workspace,ignore_errors=True)
+  write_private(result,{'message':message})
+  arguments=[sys.executable,str(Path(root)/'app.py'),'--update-result']
+  if resume is not None:
+   arguments+=['--profile='+resume['launcher'],'--resume-update='+token]
+  subprocess.Popen(arguments,cwd=root,start_new_session=True,close_fds=True)
+ finally:
+  if token is not None:
+   try:shutil.rmtree(resume_directory(state,token),ignore_errors=True)
+   except (OSError,ValueError):pass
+  shutil.rmtree(workspace,ignore_errors=True)
 
-if __name__=='__main__' and len(sys.argv)==6 and sys.argv[1]=='--install-prepared':helper_main(*sys.argv[2:])
+if __name__=='__main__' and len(sys.argv) in (6,7) and sys.argv[1]=='--install-prepared':helper_main(*sys.argv[2:])

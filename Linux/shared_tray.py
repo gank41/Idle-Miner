@@ -12,6 +12,9 @@ ACTIONS=frozenset(('show_stats','show_log','start','stop','end_boost','settings'
 FRESH_SECONDS=6
 MAX_BYTES=16384
 
+def valid_action(action):
+ return isinstance(action,str) and (action in ACTIONS or re.fullmatch(r'quit-update:[a-f0-9]{32}',action) is not None)
+
 def private_directory(path):
  path=Path(path);path.mkdir(parents=True,exist_ok=True,mode=0o700)
  info=path.lstat()
@@ -116,7 +119,7 @@ class SharedTray:
    except (OSError,ValueError,TypeError,KeyError):continue
   return result
  def send(self,target,action):
-  if action not in ACTIONS or target.get('profile') not in PROFILES or target.get('coin') not in COINS:return False
+  if not valid_action(action) or target.get('profile') not in PROFILES or target.get('coin') not in COINS:return False
   if type(target.get('pid')) is not int or not re.fullmatch('[a-f0-9]{32}',str(target.get('nonce',''))):return False
   self.prune()
   if len(list(self.directory.glob('command-*.json')))>=32:return False
@@ -135,7 +138,7 @@ class SharedTray:
     if data.get('profile')!=self.profile:continue
     path.unlink(missing_ok=True)
     if data.get('schema')!=1 or data.get('pid')!=os.getpid() or data.get('nonce')!=self.nonce or data.get('coin')!=coin or not fresh(data.get('time'),10):continue
-    if data.get('action') in ACTIONS:actions.append((data['time'],{'stop':1,'quit':2}.get(data['action'],0),path.name,data['action']))
+    if valid_action(data.get('action')):actions.append((data['time'],{'stop':1,'quit':2,'quit-update':2}.get(data['action'].split(':',1)[0],0),path.name,data['action']))
    except (OSError,ValueError,TypeError):continue
   self.prune();return [entry[3] for entry in sorted(actions)]
  def close(self):

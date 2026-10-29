@@ -9,6 +9,18 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$root/macOS/Info.plist" "$app/Contents/Info.plist"
 /usr/bin/ditto "$root/macOS/Resources" "$app/Contents/Resources"
 /usr/bin/swiftc -target arm64-apple-macos14.0 -O -module-cache-path /private/tmp/miner-swift-cache -framework AppKit -framework IOKit -framework ServiceManagement -F "$root/Vendor/Sparkle" -framework Sparkle -Xlinker -rpath -Xlinker @executable_path/../Frameworks "$root"/Sources/*.swift -o "$app/Contents/MacOS/IdleMiner"
+broker="$app/Contents/Helpers/Idle Miner Update Resume.app"
+mkdir -p "$broker/Contents/MacOS"
+/usr/bin/python3 - "$root/macOS/Info.plist" "$broker/Contents/Info.plist" <<'PYINFO'
+import plistlib,sys
+with open(sys.argv[1],"rb") as source:
+    host=plistlib.load(source)
+info={"CFBundleIdentifier":host["CFBundleIdentifier"]+".update-resume","CFBundleExecutable":"IdleMinerUpdateResume","CFBundleName":"Idle Miner Update Resume","CFBundlePackageType":"APPL","CFBundleVersion":host["CFBundleVersion"],"CFBundleShortVersionString":host["CFBundleShortVersionString"],"LSMinimumSystemVersion":"14.0","LSUIElement":True}
+with open(sys.argv[2],"wb") as target:
+    plistlib.dump(info,target)
+PYINFO
+/usr/bin/swiftc -target arm64-apple-macos14.0 -O -module-cache-path /private/tmp/miner-swift-cache -framework AppKit "$root/Sources/Core.swift" "$root/Sources/ProfileCoordination.swift" "$root/Sources/UpdateResume.swift" "$root/Sources/UpdateResumeBroker.swift" "$root/macOS/UpdateResumeBroker/main.swift" -o "$broker/Contents/MacOS/IdleMinerUpdateResume"
+/usr/bin/codesign --force --sign - "$broker"
 /usr/bin/clang -target arm64-apple-macos14.0 -Wall -Wextra -O2 "$root/Sources/supervisor.c" -o "$app/Contents/Resources/miner-supervisor"
 /usr/bin/codesign --force --sign - "$app/Contents/Resources/miner-supervisor"
 /usr/bin/codesign --force --sign - "$app"

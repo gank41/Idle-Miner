@@ -1,12 +1,12 @@
 # Privacy and network connections
 
-This describes Idle Miner **1.9 (build 12)**. Idle Miner runs locally and does not require an Idle Miner account. The app source contains no developer-operated analytics or telemetry service. Its mining and reporting features contact the third parties below; those services can observe your connection's IP address and the data sent to them.
+This describes Idle Miner **1.9.1 (build 13)**. Idle Miner runs locally and does not require an Idle Miner account. The app source contains no developer-operated analytics or telemetry service. Its mining and reporting features contact the third parties below; those services can observe your connection's IP address and the data sent to them.
 
 ## Wallet addresses
 
 Idle Miner stores public native-network BTC, LTC, DOGE, and ETH Receive addresses and preferences in your user account. It does not need or store wallet passwords, private keys, or recovery phrases. An ETH `0x` address does not identify its payout network; confirm the provider and wallet networks match. A public address is not a secret key, but sharing it can reveal or link financial activity.
 
-Saving a valid address on Mac allows the app to fetch unMineable statistics automatically, even while mining is stopped. Version 1.9 has no Mac reporting opt-out switch. On Linux, Settings has **Read earnings from unMineable using my public receive address**, enabled by default; turning it off disables those address/account API queries. The Linux price query still runs. Starting mining sends the selected address to the pool regardless of that reporting checkbox. This also applies to mining started by your separate login-mining opt-in.
+Saving a valid address on Mac allows the app to fetch unMineable statistics automatically, even while mining is stopped. Version 1.9.1 has no Mac reporting opt-out switch. On Linux, Settings has **Read earnings from unMineable using my public receive address**, enabled by default; turning it off disables those address/account API queries. The Linux price query still runs. Starting mining sends the selected address to the pool regardless of that reporting checkbox. This also applies to mining started by your separate login-mining opt-in.
 
 ## Connections
 
@@ -40,3 +40,7 @@ Logs and engine configurations can contain public addresses, worker/account deta
 - Quit every instance before backing up or deleting local state. Removing the app does not automatically remove settings or logs.
 
 A payout is handled by the provider and receiving wallet/exchange, not by Idle Miner. Check those services for their current privacy, payout, and deposit policies.
+
+## Restoring mining after updates
+
+Version 1.9.1 stores a short-lived, private local handoff containing currency identifiers and whether mining was enabled before an update. It contains no receive addresses, passwords, keys or recovery phrases and is not sent to the website. A successful update restart consumes it once. Manually stopped currencies stay stopped; resumed currencies still use the saved limits and safety rules. Ordinary manual openings stay stopped, and actual sign-ins follow the login settings.

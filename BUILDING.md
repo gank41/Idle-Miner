@@ -11,7 +11,7 @@ zsh build.sh
 
 This creates `Idle Miner.app` in the repository folder. The build uses the included
 unmodified XMRig 6.26.0 Apple Silicon engine and its license, and compiles the
-native Swift controller and C supervisor. It signs the app locally for development;
+native Swift controller, the small update restart helper, and C supervisor. It signs the app locally for development;
 it does not notarize it or create a Developer ID release. It does not install,
 launch, or start mining. Copy the app to Applications when ready. Quit all installed
 currency instances before replacing an installed app. Wallets and runtime settings
@@ -34,7 +34,7 @@ pool. Some checks require permission to inspect their own child processes. They
 neither change the installed app nor use your saved wallet. Online mining requires the app's ordinary
 Start command, an explicit `--start-mining` launch, or the separate default-off
 **Start at Login and Start Mining configured currencies** opt-in on an actual
-login launch. Manual launches stay stopped. Regression checks must not enable
+login launch. A valid built-in update restart can restore previously enabled currencies under normal idle and safety limits. Manual launches stay stopped. Regression checks must not enable
 login registration or use real wallet addresses.
 
 ## Linux
@@ -61,9 +61,9 @@ the same native/Python controller, supervisor, resources and pinned upstream
 engine source as the downloadable release. Public packages must contain no wallets,
 settings, logs, account balances, developer credentials or private audit records.
 
-Version 1.9 (build 12) adds built-in, user-invoked updates. Mac embeds Sparkle 2.10.1 and requires its matching framework and tools under `Vendor/Sparkle`; retain Sparkle's license in the app. The pinned Ed25519 public key is in `macOS/Info.plist` and `Linux/update_public_key.txt`. Production signing uses the login Keychain account `local.jeff.idleminer.updates`; private key material must never be exported into the repository, a release archive, or a staging directory. Ordinary source builds do not need the private update-signing key.
+Version 1.9.1 (build 13) adds restoration of pre-update currency states to built-in, user-invoked updates. Mac embeds Sparkle 2.10.1 and requires its matching framework and tools under `Vendor/Sparkle`; retain Sparkle's license in the app. The pinned Ed25519 public key is in `macOS/Info.plist` and `Linux/update_public_key.txt`. Production signing uses the login Keychain account `local.jeff.idleminer.updates`; private key material must never be exported into the repository, a release archive, or a staging directory. Ordinary source builds do not need the private update-signing key.
 
-Record fresh results in [the 1.9 release notes](docs/releases/v1.9.md). Automated fixture checks establish signature rejection and installation policy behavior; they do not establish a successful live published update, administrator authorization, notarization, or native Asahi hardware operation.
+Record fresh results in [the 1.9.1 release notes](docs/releases/v1.9.1.md). Automated fixture checks establish signature rejection and installation policy behavior; they do not establish a successful live published update, administrator authorization, notarization, or native Asahi hardware operation.
 
 ## Website deployment
 

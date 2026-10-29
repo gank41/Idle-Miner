@@ -5,7 +5,7 @@ app=${1:-"$root/Idle Miner.app"}
 identity=${IDLE_MINER_SIGN_IDENTITY:?Set IDLE_MINER_SIGN_IDENTITY to your Developer ID Application identity.}
 [[ $(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist") == local.jeff.idleminer ]] || { print -u2 'Refusing to sign an unrelated app.'; exit 1; }
 framework="$app/Contents/Frameworks/Sparkle.framework/Versions/B"
-for target in "$framework/XPCServices/Downloader.xpc" "$framework/XPCServices/Installer.xpc" "$framework/Updater.app" "$framework/Autoupdate" "$app/Contents/Frameworks/Sparkle.framework" "$app/Contents/Resources/miner-supervisor"; do
+for target in "$framework/XPCServices/Downloader.xpc" "$framework/XPCServices/Installer.xpc" "$framework/Updater.app" "$framework/Autoupdate" "$app/Contents/Frameworks/Sparkle.framework" "$app/Contents/Resources/miner-supervisor" "$app/Contents/Helpers/Idle Miner Update Resume.app"; do
   /usr/bin/codesign --force --options runtime --timestamp --sign "$identity" "$target"
 done
 /usr/bin/codesign --force --options runtime --timestamp --entitlements "$root/macOS/MiningEngine.entitlements" --sign "$identity" "$app/Contents/Resources/xmrig"

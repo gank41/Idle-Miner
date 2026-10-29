@@ -20,13 +20,14 @@ import tempfile
 import threading
 import time
 import xml.sax.saxutils
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORK = ROOT / "Vendor/Sparkle/Sparkle.framework"
 SIGN = ROOT / "Vendor/Sparkle/bin/sign_update"
 WORK = Path(tempfile.mkdtemp(prefix="idle-sparkle-integration-", dir="/private/tmp"))
 WALLET = "fake-public-wallet-preserved-outside-the-bundle\n"
-BUNDLE_ID = "local.jeff.idleminer.updatefixture"
+BUNDLE_ID = "local.jeff.idleminer.updatefixture." + uuid.uuid4().hex
 OVERALL_DEADLINE = time.monotonic() + 120
 
 
@@ -55,7 +56,7 @@ def sign_app(app):
     run("/usr/bin/codesign", "--verify", "--deep", "--strict", app)
 
 
-def make_app(path, binary, public, feed, report, state, build):
+def make_app(path, binary, public, feed, report, state, build, cancel=False):
     contents = path / "Contents"
     (contents / "MacOS").mkdir(parents=True)
     (contents / "Frameworks").mkdir()
@@ -70,12 +71,20 @@ def make_app(path, binary, public, feed, report, state, build):
         "SUEnableSystemProfiling": False, "SURequireSignedFeed": True,
         "SUVerifyUpdateBeforeExtraction": True, "SUPublicEDKey": public,
         "SUFeedURL": feed, "FixtureReportPath": str(report),
-        "FixtureStatePath": str(state),
+        "FixtureStatePath": str(state), "FixtureCancelUpdate": cancel,
         "NSAppTransportSecurity": {"NSAllowsArbitraryLoads": True,
                                    "NSAllowsLocalNetworking": True},
     }
     with (contents / "Info.plist").open("wb") as target:
         plistlib.dump(info, target)
+    broker = contents / "Helpers/Idle Miner Update Resume.app/Contents"
+    (broker / "MacOS").mkdir(parents=True)
+    shutil.copy2(binary, broker / "MacOS/UpdaterFixture")
+    (broker / "Frameworks").mkdir()
+    run("/usr/bin/ditto", FRAMEWORK, broker / "Frameworks/Sparkle.framework")
+    with (broker / "Info.plist").open("wb") as out:
+        plistlib.dump({"CFBundleIdentifier": BUNDLE_ID + ".broker", "CFBundleExecutable": "UpdaterFixture", "CFBundleName": "Update Resume Broker", "CFBundleVersion": str(build), "CFBundleShortVersionString": "1.0", "LSUIElement": True}, out)
+    sign_app(broker.parent)
     sign_app(path)
 
 
@@ -97,6 +106,7 @@ def cleanup_pids(report):
 def exercise(mode, binary, public, key, server):
     archive_format = "dmg" if mode.endswith("-dmg") else "zip"
     tampered = mode.startswith("tampered")
+    cancelled = mode == "cancel"
     scenario = WORK / mode
     published = scenario / "published"
     published.mkdir(parents=True)
@@ -108,7 +118,7 @@ def exercise(mode, binary, public, key, server):
     (state / "fake-wallet.txt").write_text(WALLET)
     port = server.server_address[1]
     feed = f"http://127.0.0.1:{port}/{mode}/published/appcast.xml"
-    make_app(installed, binary, public, feed, report, state, 1)
+    make_app(installed, binary, public, feed, report, state, 1, cancelled)
     make_app(update, binary, public, feed, report, state, 2)
     archive = published / f"fixture-update.{archive_format}"
     if archive_format == "zip":
@@ -151,6 +161,8 @@ def exercise(mode, binary, public, key, server):
             rows = events(report)
             if any(row["event"] == "fixture-error" for row in rows):
                 raise AssertionError(f"{mode}: fixture error: {rows}")
+            if cancelled and any(row["event"] == "cancelled" for row in rows):
+                break
             if not tampered and any(row["event"] == "relaunched" for row in rows):
                 break
             if any(row["event"] == "rejected" for row in rows):
@@ -165,6 +177,14 @@ def exercise(mode, binary, public, key, server):
         assert offer["installed"] == "1.0 (1)" and offer["latest"] == "1.0 (2)", offer
         assert offer["button"] == "Download and Install Now", offer
         assert "Signed fixture release notes" in offer["notes"], offer
+        if cancelled:
+            stopped_broker = next(row for row in rows if row["event"] == "cancelled")
+            assert stopped_broker["workerRunning"] and stopped_broker["remainingPeers"] == 3, rows
+            assert not any(row["event"] in ("prepared", "resume-armed", "terminating") for row in rows), rows
+            assert not (state / "UpdateResume/receipt.json").exists(), rows
+            assert (state / "fake-wallet.txt").read_text() == WALLET
+            print("PASS: cancelled actual Sparkle check closes broker while preserving controller, three peers and worker", flush=True)
+            return
         prepared = [row for row in rows if row["event"] == "prepared"]
         assert prepared and all(row["remainingPeers"] == 0 and not row["workerRunning"] and row["retainedWorkerLeases"] == 5 for row in prepared), rows
         assert any(row["event"] == "peer-terminated" for row in rows), rows
@@ -178,12 +198,20 @@ def exercise(mode, binary, public, key, server):
             assert relaunched["build"] == "2" and installed_build == "2", rows
             assert Path(relaunched["path"]).resolve() == installed.resolve(), rows
             assert relaunched["wallet"] == WALLET, rows
-            assert not any("mining" in arg.lower() for arg in next(row for row in rows if row["event"] == "launched" and row["build"] == "2")["arguments"]), rows
+            assert relaunched["resumed"] == {"ETH": True, "DOGE": True, "BTC": False, "LTC": False}, rows
+            assert relaunched["primary"] == "ETH" and not relaunched["replayed"], rows
+            assert any(row["event"] == "resume-armed" for row in rows), rows
+            assert not (state / "UpdateResume/receipt.json").exists(), rows
+            arguments = next(row for row in rows if row["event"] == "launched" and row["build"] == "2")["arguments"]
+            assert len(arguments) == 2 and arguments[1].startswith("--update-resume="), rows
+            assert any(row["event"] == "broker-opened" for row in rows), rows
         else:
             rejection = next(row for row in rows if row["event"] == "rejected")
             assert installed_build == "1" and not any(row["event"] == "relaunched" for row in rows), rows
+            assert not (state / "UpdateResume/receipt.json").exists(), rows
+            assert not any(row["event"] == "terminating" for row in rows), "Error cleanup quit the controller"
             assert re.search(r"sign(?:ature|ed|ing)", rejection["message"], re.I), rejection
-        print(f"PASS: {mode} actual Sparkle {archive_format.upper()}, install build {installed_build}, exact spaced path, graceful peer/worker stop, preserved external wallet", flush=True)
+        print(f"PASS: {mode} actual Sparkle {archive_format.upper()}, install build {installed_build}, exact spaced path, graceful peers/worker stop, exact single-use mining resume, preserved external wallet", flush=True)
     finally:
         cleanup_pids(report)
         try:
@@ -201,18 +229,19 @@ def main():
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        sources = ["Core.swift", "ProfileCoordination.swift", "UpdateCoordination.swift", "UpdateUserDriver.swift"]
+        sources = ["Core.swift", "ProfileCoordination.swift", "UpdateCoordination.swift", "UpdateUserDriver.swift", "UpdateResume.swift", "UpdateResumeBroker.swift"]
         run("/usr/bin/swiftc", "-parse-as-library", "-module-cache-path", WORK / "swift-cache", "-framework", "AppKit", "-framework", "CryptoKit", "-F", ROOT / "Vendor/Sparkle", "-framework", "Sparkle", "-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks", "-Xlinker", "-rpath", "-Xlinker", ROOT / "Vendor/Sparkle", *[ROOT / "Sources" / name for name in sources], ROOT / "Tests/SparkleInstallFixture.swift", "-o", binary)
         run(binary, "--generate-key", key, public_file)
         assert key.stat().st_mode & 0o777 == 0o600
         public = public_file.read_text().strip()
         assert len(base64.b64decode(public)) == 32
+        exercise("cancel", binary, public, key, server)
         exercise("valid", binary, public, key, server)
         exercise("tampered", binary, public, key, server)
         exercise("valid-dmg", binary, public, key, server)
         exercise("tampered-dmg", binary, public, key, server)
-        assert set((WORK / "http.log").read_text().splitlines()) == {f'"GET /{mode}/published/{name} HTTP/1.1" 200 -' for mode in ("valid", "tampered", "valid-dmg", "tampered-dmg") for name in ("appcast.xml", "fixture-update.dmg" if mode.endswith("-dmg") else "fixture-update.zip")}, "Unexpected loopback request"
-        (WORK / "summary.json").write_text(json.dumps({"validZIPInstall": "passed", "tamperedZIPArchive": "rejected", "validDMGInstall": "passed", "tamperedDMGArchive": "rejected", "externalWallet": "preserved", "actualEmbeddedSparkle": "2.10.1", "productionEndpointOrKeychainUsed": False}, indent=2) + "\n")
+        assert set((WORK / "http.log").read_text().splitlines()) == {f'"GET /{mode}/published/{name} HTTP/1.1" 200 -' for mode in ("cancel", "valid", "tampered", "valid-dmg", "tampered-dmg") for name in (("appcast.xml",) if mode == "cancel" else ("appcast.xml", "fixture-update.dmg" if mode.endswith("-dmg") else "fixture-update.zip"))}, "Unexpected loopback request"
+        (WORK / "summary.json").write_text(json.dumps({"cancelPreservesControllerPeersAndWorker": "passed", "brokerCapabilityRequired": True, "validZIPInstall": "passed", "tamperedZIPArchive": "rejected", "validDMGInstall": "passed", "tamperedDMGArchive": "rejected", "externalWallet": "preserved", "actualEmbeddedSparkle": "2.10.1", "productionEndpointOrKeychainUsed": False}, indent=2) + "\n")
     finally:
         key.unlink(missing_ok=True)
         server.shutdown()

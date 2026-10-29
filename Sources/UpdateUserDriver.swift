@@ -3,6 +3,8 @@ import Sparkle
 
 @MainActor final class UpdateUserDriver:NSObject,SPUUserDriver,NSWindowDelegate {
  var prepareForInstallation:(() async throws->Void)?
+ var installationFailed:(()->Void)?
+ private(set) var selectedUpdate:SUAppcastItem?
  private(set) var state:UpdatePresentationState
  private(set) var updateWindow:NSWindow?
  private let versionLabel=NSTextField(wrappingLabelWithString:"")
@@ -60,6 +62,7 @@ import Sparkle
  }
  func showUpdateInFocus() { updateWindow?.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true) }
  private func record(_ item:SUAppcastItem) {
+  selectedUpdate=item
   state.latestVersion="\(item.displayVersionString) (\(item.versionString))"
   let embedded=item.itemDescription ?? ""
   notes.string=item.itemDescriptionFormat=="plain-text" ? String(embedded.prefix(262_144)):UpdateReleaseNotes.plainText(embedded)
@@ -94,7 +97,7 @@ import Sparkle
    await waitForAcknowledgement();return .dismiss
   }
   state.phase = .available;closeChoice=updateState.stage == .installing ? .skip:.dismiss
-  render("Read the changes below. Installing will stop mining in all windows, update this copy of Idle Miner, and reopen it with mining stopped.")
+  render("Read the changes below. Installing will stop mining in all windows, update this copy of Idle Miner, and restore the currencies that were open. Previously enabled mining resumes in Automatic mode with the usual safety protections.")
   let result=await withCheckedContinuation { choice=$0 }
   if result == .install { return await prepareInstallation(installing:updateState.stage == .installing) }
   return result
@@ -114,6 +117,7 @@ import Sparkle
   await waitForAcknowledgement()
  }
  func showUpdaterError(_ error:Error) async {
+  installationFailed?()
   cancellation=nil;progress.stopAnimation(nil);state.phase = .finished
   render("The update could not be completed. Your current app and preferences remain available.\n\n\(error.localizedDescription)")
   await waitForAcknowledgement()
@@ -142,19 +146,20 @@ import Sparkle
   do {
    try await prepareForInstallation()
    state.phase = installing ? .installing:.downloading
-   render(installing ? "Installing update… Idle Miner will reopen with mining stopped.":"Preparing the update download… Mining is stopped.")
+   render(installing ? "Installing update… Idle Miner will restore the previous currencies and Automatic mining state.":"Preparing the update download… Mining is stopped.")
    return .install
   }
   catch {
+   installationFailed?()
    state.phase = .finished;preserveFailureWindow=true;render(error.localizedDescription)
    return .skip
   }
  }
  func showInstallingUpdate(withApplicationTerminated terminated:Bool,retryTerminatingApplication:@escaping ()->Void) {
-  state.phase = .installing;render("Installing update… Idle Miner will reopen with mining stopped.")
+  state.phase = .installing;render("Installing update… Idle Miner will restore the previous currencies and Automatic mining state.")
  }
  func showUpdateInstalledAndRelaunched(_ relaunched:Bool) async {
-  state.phase = .finished;render(relaunched ? "Update installed. Idle Miner has reopened with mining stopped.":"Update installed.")
+  state.phase = .finished;render(relaunched ? "Update installed. Idle Miner has reopened with its previous currencies and Automatic mining state.":"Update installed.")
   await waitForAcknowledgement()
  }
  func dismissUpdateInstallation() {

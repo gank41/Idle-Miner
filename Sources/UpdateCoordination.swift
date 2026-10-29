@@ -28,8 +28,12 @@ enum UpdateReleaseNotes {
  private let base:URL
  private var updateLease:FileLease?
  private var engineLeases=[FileLease]()
+ private let resume:UpdateResumeStore
+ private var resumePIDs:Set<Int32>?
+ private var resumeArmed=false
  private(set) var isPreparing=false
- init(base:URL) { self.base=base }
+ var hasArmedResume:Bool { resumeArmed }
+ init(base:URL) { self.base=base;resume=UpdateResumeStore(base:base) }
  static func matches(bundleURL:URL?,bundleIdentifier:String?,hostURL:URL,hostIdentifier:String?)->Bool {
   guard let bundleURL,let hostIdentifier,!hostIdentifier.isEmpty,bundleIdentifier==hostIdentifier else { return false }
   return bundleURL.resolvingSymlinksInPath().standardizedFileURL == hostURL.resolvingSymlinksInPath().standardizedFileURL
@@ -38,10 +42,30 @@ enum UpdateReleaseNotes {
   guard updateLease==nil else { return }
   let directory=base.appendingPathComponent("Coordination",isDirectory:true)
   try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
-  do { updateLease=try FileLease(url:directory.appendingPathComponent("update.lock")) }
+  do { updateLease=try FileLease(url:directory.appendingPathComponent("update.lock"));resumeArmed=false }
   catch { throw MinerError.message("Another Idle Miner window is checking or installing an update. Finish or close that update window first.") }
  }
- func endCycle() { engineLeases.removeAll();updateLease=nil;isPreparing=false }
+ func endCycle(discardResume:Bool=false) {
+  if discardResume || !resumeArmed { try? resume.cancel() }
+  engineLeases.removeAll();updateLease=nil;isPreparing=false;resumePIDs=nil
+ }
+ func captureResume(profile:String,coin:String,enabled:Bool,targetBuild:String,targetVersion:String)throws {
+  guard updateLease != nil else { throw MinerError.message("The update session ended.") }
+  if resumePIDs != nil { return }
+  let peers=matchingPeers()
+  let pids=Set(peers.map{$0.processIdentifier}+[getpid()])
+  var expected=[String:Int32]()
+  for slot in ["default"]+Settings.coins {
+   if let pid=ProfileCoordinator.existingPID(base:base,profile:slot),pids.contains(pid) { expected[slot]=pid }
+  }
+  guard Set(expected.values)==pids,expected[profile]==getpid() else { throw MinerError.message("An Idle Miner window could not confirm its mining state. Close that window and try the update again.") }
+  let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? ""
+  try resume.begin(bundleURL:Bundle.main.bundleURL,sourceBuild:build,targetBuild:targetBuild,targetVersion:targetVersion,primaryProfile:profile,expected:expected)
+  resumePIDs=pids
+  try resume.acknowledge(bundleURL:Bundle.main.bundleURL,sourceBuild:build,profile:profile,pid:getpid(),coin:coin,enabled:enabled)
+ }
+ func finalizeResume()throws { try resume.finalize() }
+ func armResume()throws { try resume.arm();resumeArmed=true }
  func matchingPeers()->[NSRunningApplication] {
   NSWorkspace.shared.runningApplications.filter {
    $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated && Self.matches(bundleURL:$0.bundleURL,bundleIdentifier:$0.bundleIdentifier,hostURL:Bundle.main.bundleURL,hostIdentifier:Bundle.main.bundleIdentifier)
@@ -58,6 +82,9 @@ enum UpdateReleaseNotes {
    while true {
     try Task.checkCancellation()
     let peers=runningPeers?() ?? matchingPeers()
+    if let known=resumePIDs,!Set(peers.map{$0.processIdentifier}).isSubset(of:known) {
+     throw MinerError.message("Another Idle Miner window opened during the update. The update was cancelled; try again.")
+    }
     for peer in peers where asked.insert(peer.processIdentifier).inserted { _=peer.terminate() }
     if peers.isEmpty && !isEngineRunning() {
      // Retain all five locks together until Sparkle takes over. A newly opened
@@ -76,6 +103,6 @@ enum UpdateReleaseNotes {
     }
     try await Task.sleep(for:.milliseconds(100))
    }
-  } catch { engineLeases.removeAll();isPreparing=false;throw error }
+  } catch { try? resume.cancel();resumePIDs=nil;engineLeases.removeAll();isPreparing=false;throw error }
  }
 }

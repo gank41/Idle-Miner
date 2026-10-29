@@ -1,4 +1,4 @@
-IDLE MINER 1.9 (BUILD 12) FOR LINUX
+IDLE MINER 1.9.1 (BUILD 13) FOR LINUX
 By Jeffry Zander
 
 INSTALL
@@ -88,11 +88,20 @@ packages are missing, it explains how to install them in a terminal while
 leaving the current app running; the updater never asks for hidden sudo.
 
 After preparation, all currencies stop and quit gracefully. The updater waits
-for every mining supervisor to finish, replaces the app in its existing folder,
-and reopens stopped. Choose Start when ready to mine again. Wallets, settings,
+for every mining supervisor to finish and replaces the app in its existing
+folder. After a successful update, each previously open currency returns to its
+exact enabled or stopped state. Enabled currencies use their normal idle and
+safety settings, including any automatic pause; manually stopped currencies
+stay stopped. Boost and offline benchmarks do not resume. Wallets, settings,
 logs, desktop entries, and login preferences stay in place. The previous app
 folder is retained beside the installation for recovery; a failed replacement
-restores it. A busy app or engine prevents replacement.
+restores it and does not resume mining. A busy app or engine prevents replacement.
+
+The update from 1.9 to 1.9.1 uses the old updater, which cannot capture currency
+states, so that first transition reopens stopped. Automatic restoration applies
+to subsequent successful updates initiated by 1.9.1 or later. Manual launches
+without a valid update receipt stay stopped. Actual OS login follows the
+separate Start at Login and Start Mining preference in Settings.
 
 Update checks contact https://idleminer.app/updates/stable.json and its
 Ed25519 signature only when requested, at most once every 30 seconds. The

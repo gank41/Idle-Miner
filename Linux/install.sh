@@ -5,7 +5,7 @@ if [[ $(uname -s) != Linux || ! -f /etc/os-release ]]; then echo 'Run this insta
 if [[ $EUID == 0 ]]; then echo 'Run as your normal desktop user, not with sudo. The installer asks for sudo only for dependencies.'; exit 1; fi
 if [[ $(uname -m) != aarch64 && $(uname -m) != x86_64 ]]; then echo 'A 64-bit ARM or x86 Linux system is required.'; exit 1; fi
 source /etc/os-release
-printf '%s\n' 'Installing Idle Miner 1.9 (build 12) for this user. Installing never starts mining; login mining requires an explicit Settings opt-in.'
+printf '%s\n' 'Installing Idle Miner 1.9.1 (build 13) for this user. Installing never starts mining; login mining requires an explicit Settings opt-in.'
 case " $ID ${ID_LIKE:-} " in
  *fedora*)
   packages=(openssl python3-pyside6 gcc gcc-c++ libstdc++-static cmake make libuv-devel openssl-devel hwloc-devel kf6-kidletime-devel qt6-qtwayland)

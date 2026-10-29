@@ -46,6 +46,7 @@ import AppKit
  var timer:Timer?
  var activity:NSObjectProtocol?
  var enabled=false
+ var automaticMiningIntent:Bool { (enabled || pendingRestart) && benchmarkDeadline==nil }
  var desiredThreads=0
  var loadGovernor=LoadGovernor()
  var quitting=false
@@ -105,6 +106,8 @@ import AppKit
    let coin=String(argument.dropFirst("--currency=".count))
    if Settings.coins.contains(coin) { settings.switchCoin(to:coin) }
   }
+  let updateResume=try? UpdateResumeStore(base:baseFolder).consume(bundleURL:Bundle.main.bundleURL,build:Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "",version:Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "",loginLaunch:loginLaunch,capability:UpdateResumeBroker.capability(in:CommandLine.arguments))
+  if let updateResume { settings.switchCoin(to:updateResume.primaryCoin) }
   let loginCurrencies=StartupPlan.currencies(settings,loginLaunch:loginLaunch,loginEnabled:loginManager.status == .enabled,profile:profileName)
   if let first=loginCurrencies.first { settings.switchCoin(to:first) }
   DistributedNotificationCenter.default().addObserver(self,selector:#selector(showProfile(_:)),name:Notification.Name("local.jeff.idleminer.showProfile"),object:profileName)
@@ -139,13 +142,21 @@ import AppKit
   let t=Timer(timeInterval:1,repeats:true){ [weak self] _ in MainActor.assumeIsolated { self?.tick() } }
   RunLoop.main.add(t,forMode:.common); timer=t
   tick()
-  if let argument=CommandLine.arguments.first(where:{$0.hasPrefix("--boost-minutes=")}),
+  if loginLaunch { if !loginCurrencies.isEmpty { startConfiguredCurrenciesAtLogin(loginCurrencies) } }
+  else if let updateResume { restoreAfterUpdate(updateResume) }
+  else if let argument=CommandLine.arguments.first(where:{$0.hasPrefix("--boost-minutes=")}),
      let minutes=Int(argument.dropFirst("--boost-minutes=".count)), TimedBoost.durations.contains(minutes) {
    beginBoost(minutes:minutes)
   } else if CommandLine.arguments.contains("--start-mining") { startMining() }
-  else if !loginCurrencies.isEmpty { startConfiguredCurrenciesAtLogin(loginCurrencies) }
+
   if CommandLine.arguments.contains("--show-stats") { showStatistics() }
   if CommandLine.arguments.contains("--show-settings") { showSettings() }
+ }
+ func restoreAfterUpdate(_ plan:UpdateResumePlan) {
+  if plan.currencies[settings.coin]==true { startMining() }
+  for coin in Settings.coins where coin != settings.coin && plan.currencies[coin] != nil {
+   openCurrencyInstance(coin,startMining:plan.currencies[coin]==true,showStats:false)
+  }
  }
  func makeMenus() {
   let main=NSMenu(); let edit=NSMenu(title:"Edit"); let editItem=NSMenuItem(); editItem.submenu=edit
@@ -332,8 +343,8 @@ import AppKit
     if secondary { field.textColor = .secondaryLabelColor }
     stack.addArrangedSubview(field); field.widthAnchor.constraint(equalTo:stack.widthAnchor).isActive=true
    }
-   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.9"
-   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "12"
+   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.9.1"
+   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "13"
    centered("Idle Miner",size:24,bold:true)
    centered("By Jeffry Zander",size:14)
    centered("Version \(version) (\(build))",secondary:true)
@@ -346,6 +357,9 @@ import AppKit
  }
  @objc func quitApp() { NSApp.terminate(nil) }
  func applicationShouldTerminate(_ sender:NSApplication)->NSApplication.TerminateReply {
+  // Capture actual in-memory intent before termination clears enabled. The
+  // request is scoped to this bundle/build/profile/PID and acknowledges once.
+  try? UpdateResumeStore(base:baseFolder).acknowledge(bundleURL:Bundle.main.bundleURL,sourceBuild:Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "",profile:profileName,pid:getpid(),coin:settings.coin,enabled:automaticMiningIntent)
   quitting=true;statusItem?.isVisible=false;sharedMenuStore?.releaseOwnership()
   enabled=false; boost=nil; benchmarkDeadline=nil; timer?.invalidate()
   if engine?.running == true { quitting=true; engine.stop(); return .terminateLater }

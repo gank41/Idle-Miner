@@ -11,7 +11,7 @@ from startup import startup_plan,autostart_enabled,login_entry,save_login_prefer
 from platform_linux import Sensors
 from network import Network
 from shared_tray import SharedTray,profile_currency,focus_matches
-from updates import check_async,newer,install_metadata,prepare_update,UpdateCancelled,request_shutdown
+from updates import check_async,newer,install_metadata,prepare_update,UpdateCancelled,request_shutdown,begin_resume,acknowledge_resume,consume_resume,discard_resume,installed_version
 ROOT=Path(__file__).resolve().parent
 STATE=Path(os.environ.get('IDLE_MINER_STATE',str(Path.home()/'.config/idle-miner')))
 PROFILE=next((arg.split('=',1)[1] for arg in sys.argv if arg.startswith('--profile=')),'default')
@@ -181,7 +181,8 @@ class Window(QMainWindow):
   t=now()
   if self.quitting:return
   for action in self.shared_tray.take_commands(self.settings['coin']):
-   if action.startswith('boost:'):self.boost(int(action.split(':')[1]))
+   if action.startswith('quit-update:'):self.quit_for_update(action.split(':',1)[1])
+   elif action.startswith('boost:'):self.boost(int(action.split(':')[1]))
    else:
     handler={'show_stats':self.show_stats,'show_log':self.show_log,'start':self.start,'stop':self.stop,'end_boost':self.end_boost,'settings':self.settings_dialog,'pool':self.open_pool,'refresh':lambda:self.refresh(True),'quit':self.quit}.get(action)
     if handler:handler()
@@ -356,7 +357,7 @@ class Window(QMainWindow):
   if not newer(release['version'],release['build'],VERSION,BUILD):self.update_status.setText('Idle Miner is up to date.');return
   try:install_metadata(release)
   except ValueError as exc:self.update_status.setText(str(exc));return
-  self.update_status.setText('The update will install in this app’s current location. Settings and wallets are kept. All currencies will quit after preparation; Idle Miner will reopen stopped.');self.update_install.setEnabled(True)
+  self.update_status.setText('The update will install in this app’s current location. Settings and wallets are kept. All currencies will quit after preparation. Previously enabled currencies will resume using their automatic mining settings; stopped currencies stay stopped.');self.update_install.setEnabled(True)
  def update_progress(self,text):
   if self.update_dialog:self.update_status.setText(text)
  def update_failed(self,message):
@@ -387,12 +388,18 @@ class Window(QMainWindow):
    for profile in ('default',*COINS):
     if profile not in known and held(STATE/('app.lock' if profile=='default' else profile+'.lock')):raise ValueError('A currency window has not reported its status. Close that window, then try installing again.')
    helper=workspace/'update-helper.py';shutil.copy2(ROOT/'updates.py',helper)
-   # Queue every Stop before any Quit, so no currency keeps mining during shutdown.
-   request_shutdown(self.shared_tray,targets)
-   # The helper waits for every app and engine lease; it never kills installed miners.
-   subprocess.Popen([sys.executable,str(helper),'--install-prepared',result['stage'],str(ROOT),str(STATE),str(workspace)],cwd=workspace,start_new_session=True,close_fds=True)
+   own=dict(profile=self.profile,coin=self.settings['coin'],pid=os.getpid(),nonce=self.shared_tray.nonce)
+   target_version,target_build=installed_version(result['stage'])
+   token=begin_resume(STATE,ROOT,VERSION,BUILD,target_version,target_build,[own,*targets],self.profile)
+   self.update_resume_token=token
+   # Every process captures enabled state in its own quit hook, before Stop.
+   if not self.acknowledge_update(token):raise ValueError('Could not capture this currency for the update.')
+   request_shutdown(self.shared_tray,targets,token)
+   # The helper requires every acknowledgement and every app/engine lease.
+   subprocess.Popen([sys.executable,str(helper),'--install-prepared',result['stage'],str(ROOT),str(STATE),str(workspace),token],cwd=workspace,start_new_session=True,close_fds=True)
    self.update_preparing=False;self.stop();self.quit()
   except Exception as exc:
+   discard_resume(STATE,getattr(self,'update_resume_token',None))
    shutil.rmtree(workspace,ignore_errors=True);self.update_failed('Could not begin installation. '+str(exc))
  def apply_visibility(self):
   tray_available=QSystemTrayIcon.isSystemTrayAvailable()
@@ -427,7 +434,26 @@ class Window(QMainWindow):
   self.work=Work();self.graph.work=self.work;launched=self.clock.launched;self.clock=SessionClock();self.clock.launched=launched;self.reset_reporting();self.setWindowTitle('Idle Miner · '+coin)
   if resume and valid_wallet(self.settings['address'],coin):self.start()
   elif resume:QTimer.singleShot(0,self.settings_dialog)
+ def acknowledge_update(self,token):
+  return acknowledge_resume(STATE,ROOT,token,self.profile,os.getpid(),self.shared_tray.nonce,self.pending_coin or self.settings['coin'],bool(self.enabled or self.pending_resume))
+ def quit_for_update(self,token):
+  if self.quitting or not self.acknowledge_update(token):return
+  self.stop();self.quit()
+ def apply_update_resume(self,token):
+  plan=consume_resume(STATE,ROOT,token,self.profile,VERSION,BUILD)
+  if plan is None:return
+  # Restore session currency directly; never rewrite the user's saved settings.
+  coin=plan['coin'];self.settings['coin']=coin;self.settings['address']=self.settings['wallets'][coin]
+  self.setWindowTitle('Idle Miner · '+coin);self.reset_reporting()
+  if plan['enabled'] and valid_wallet(self.settings['address'],coin):self.start()
+  for row in plan['peers']:
+   subprocess.Popen([sys.executable,str(ROOT/'app.py'),'--profile='+row['profile'],'--resume-update='+token],start_new_session=True)
  def apply_startup(self,args):
+  marker=next((arg.split('=',1)[1] for arg in args if arg.startswith('--resume-update=')),None)
+  if '--login-startup' in args:
+   discard_resume(STATE,marker)
+  elif marker is not None:
+   self.apply_update_resume(marker);return
   self.refresh_settings()
   selected,children=startup_plan(self.settings,self.profile,args,autostart_enabled(AUTOSTART))
   if selected is None:return

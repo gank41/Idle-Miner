@@ -1,5 +1,11 @@
 # Changes
 
+## 1.9.1 — build 13
+
+Successful built-in updates restore the currencies that were enabled before updating, including automatic mining temporarily paused by idle or safety conditions. Manually stopped currencies stay stopped. Normal limits and safety checks still apply; Boost and offline benchmarks are not restored. Actual sign-ins continue to follow Start at Login and its separate mining checkbox. Ordinary manual openings stay stopped. The state handoff is private, short-lived, bound to the installed location/build and consumed once.
+
+The first transition from 1.9 may remain stopped because the older updater did not capture this state. See [release notes](docs/releases/v1.9.1.md).
+
 ## 1.9 — build 12
 
 **Check for Updates…** now shows installed/latest versions and plain-text release notes inside the app, with **Close** and **Download and Install Now**. Mac uses Sparkle 2.10.1 with signed feeds and archives; Linux verifies the signed manifest and archive and builds a staged replacement before stopping the installed copy. Installation preserves wallet settings and reopens stopped. Checks run only when requested.

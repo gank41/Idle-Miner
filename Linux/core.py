@@ -2,11 +2,11 @@
 import hashlib, json, math, re, time
 from dataclasses import dataclass
 
-VERSION = '1.9.2'
-BUILD = 14
+VERSION = '1.9.3'
+BUILD = 15
 DURATIONS = (15, 30, 60, 360, 720, 1440)
 COINS = ('BTC','LTC','DOGE','ETH')
-DEFAULTS = dict(coin='LTC', address='', wallets=dict.fromkeys(COINS,''), idle_threads=4, pause_active=False, pool_stats=True, show_dock=True, show_menu_bar=True, start_mining_at_login=False)
+DEFAULTS = dict(coin='LTC', address='', wallets=dict.fromkeys(COINS,''), idle_threads=4, pause_active=False, pool_stats=True, show_dock=True, show_menu_bar=True, start_mining_at_login=False, automatic_update_checks=False, update_check_frequency='daily')
 def now():
     return time.clock_gettime(time.CLOCK_BOOTTIME) if hasattr(time,'CLOCK_BOOTTIME') else time.monotonic()
 
@@ -77,9 +77,10 @@ def validated(s):
     result={**DEFAULTS,**s}
     if result['coin'] not in COINS: raise ValueError('Choose BTC, LTC, DOGE or ETH.')
     if type(result['idle_threads']) is not int or result['idle_threads'] not in (2,4,8,12): raise ValueError('Invalid thread count.')
-    for key in ('pause_active','pool_stats','show_dock','show_menu_bar','start_mining_at_login'):
+    for key in ('pause_active','pool_stats','show_dock','show_menu_bar','start_mining_at_login','automatic_update_checks'):
         if type(result[key]) is not bool: raise ValueError('Invalid settings.')
     if not result['show_dock'] and not result['show_menu_bar']: raise ValueError('Keep the window or menu bar visible.')
+    if result['update_check_frequency'] not in ('daily','weekly'): raise ValueError('Choose Daily or Weekly update checks.')
     supplied=s.get('wallets',{})
     if not isinstance(supplied,dict): raise ValueError('Invalid saved wallets.')
     wallets={coin:supplied.get(coin,'') for coin in COINS}

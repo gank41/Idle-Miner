@@ -54,6 +54,21 @@ class SmokeApp:MinerApp {
   precondition(loginItem.state == .off && loginCheck.state == .off && lastAlert?.contains("Test registration failure")==true,"Failed registration must restore controls and report failure")
   login.fail=false
   precondition(!enabled && !engine.running,"Login toggles must not start mining")
+  precondition(automaticUpdateCheck.state == .off && !automaticUpdateFrequency.isEnabled,"Automatic checks must be opt-in")
+  let priorSettings=try! Settings.load(from:settingsURL)
+  enabled=true // Simulate enabled automatic mining; no engine or network starts.
+  automaticUpdateCheck.performClick(nil)
+  precondition(settings.automaticUpdateChecks && automaticUpdateFrequency.isEnabled && enabled && !engine.running,"Enabling update checks must preserve mining intent without starting/stopping a worker")
+  automaticUpdateFrequency.selectItem(withTitle:"Weekly");automaticUpdateSettingsChanged(automaticUpdateFrequency)
+  let afterPreferences=try! Settings.load(from:settingsURL)
+  precondition(afterPreferences.updateCheckFrequency=="weekly" && afterPreferences.wallets==priorSettings.wallets && afterPreferences.startMiningAtLogin==priorSettings.startMiningAtLogin,"Schedule changes must preserve wallets and login settings")
+  var otherWindow=afterPreferences;otherWindow.automaticUpdateChecks=false
+  try! otherWindow.save(to:settingsURL,automaticUpdateChecksChange:false)
+  automaticUpdateFrequency.selectItem(withTitle:"Daily");automaticUpdateSettingsChanged(automaticUpdateFrequency)
+  precondition(!settings.automaticUpdateChecks && settings.updateCheckFrequency=="daily" && enabled,"A stale frequency control must preserve another currency's opt-out")
+  automaticUpdateCheck.performClick(nil);automaticUpdateCheck.performClick(nil)
+  precondition(!settings.automaticUpdateChecks && enabled,"Disabling checks must preserve mining intent")
+  enabled=false
   walletField.stringValue="Public receive address hidden in test capture"
   DispatchQueue.main.asyncAfter(deadline:.now()+1) {
    guard let view=self.window?.contentView, let bitmap=view.bitmapImageRepForCachingDisplay(in:view.bounds) else { print("FAIL: settings did not render"); exit(1) }

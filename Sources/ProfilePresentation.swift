@@ -91,7 +91,7 @@ extension MinerApp {
    if walletChanged && (enabled || engine?.running == true) {
     ignoreEngineOutput=engine.running;stopMining();fatalError="This wallet was changed in another instance. Check Settings, then Start Mining."
    }
-   settings=fresh;applyVisibility()
+   settings=fresh;applyVisibility();synchronizeAutomaticUpdateControls()
    if walletChanged { sessionClock=SessionClock(launchedAt:sessionClock.launchedAt);localStats.reset();statsService.configure(coin:fresh.coin,address:fresh.address) }
   } catch { lastSettingsData=data;stopMining();fatalError="Shared settings could not be loaded: \(error.localizedDescription)" }
  }

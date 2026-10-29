@@ -13,8 +13,10 @@ struct Settings: Codable {
  var showDock=false
  var showMenuBar=true
  var startMiningAtLogin=false
+ var automaticUpdateChecks=false
+ var updateCheckFrequency="daily"
  init() {}
- enum CodingKeys:String,CodingKey { case coin,address,idleThreads,pauseWhileActive,idleSeconds,wallets,showDock,showMenuBar,startMiningAtLogin }
+ enum CodingKeys:String,CodingKey { case coin,address,idleThreads,pauseWhileActive,idleSeconds,wallets,showDock,showMenuBar,startMiningAtLogin,automaticUpdateChecks,updateCheckFrequency }
  init(from decoder:Decoder)throws {
   let c=try decoder.container(keyedBy:CodingKeys.self)
   coin=try c.decodeIfPresent(String.self,forKey:.coin) ?? "LTC"
@@ -26,6 +28,9 @@ struct Settings: Codable {
   showDock=try c.decodeIfPresent(Bool.self,forKey:.showDock) ?? false
   showMenuBar=try c.decodeIfPresent(Bool.self,forKey:.showMenuBar) ?? true
   startMiningAtLogin=try c.decodeIfPresent(Bool.self,forKey:.startMiningAtLogin) ?? false
+  automaticUpdateChecks=try c.decodeIfPresent(Bool.self,forKey:.automaticUpdateChecks) ?? false
+  updateCheckFrequency=try c.decodeIfPresent(String.self,forKey:.updateCheckFrequency) ?? "daily"
+  if !["daily","weekly"].contains(updateCheckFrequency) { automaticUpdateChecks=false;updateCheckFrequency="daily" }
   if wallets[coin]==nil && !address.isEmpty { wallets[coin]=address }
   address=wallets[coin] ?? address
  }
@@ -36,6 +41,7 @@ struct Settings: Codable {
  }
  func validated()throws->Settings {
   guard Self.coins.contains(coin),[2,4,8,12].contains(idleThreads),idleSeconds==300 else { throw MinerError.message("Unsupported settings. Please save Settings again.") }
+  guard ["daily","weekly"].contains(updateCheckFrequency) else { throw MinerError.message("Choose Daily or Weekly for update checks.") }
   guard showDock || showMenuBar else { throw MinerError.message("Keep the Dock icon, menu bar icon, or both enabled.") }
   guard address.isEmpty || Wallet.valid(address,coin:coin) else { throw MinerError.message("The address checksum or network does not match \(coin). Copy its native Receive address again.") }
   for (currency,value) in wallets {
@@ -43,7 +49,7 @@ struct Settings: Codable {
   }
   return self
  }
- func save(to url:URL,walletChanges:[String:String]?=nil,updateDefaultCoin:Bool=true,startMiningAtLoginChange:Bool?=nil)throws {
+ func save(to url:URL,walletChanges:[String:String]?=nil,updateDefaultCoin:Bool=true,startMiningAtLoginChange:Bool?=nil,automaticUpdateChecksChange:Bool?=nil,updateCheckFrequencyChange:String?=nil)throws {
   _=try validated()
   try FileManager.default.createDirectory(at:url.deletingLastPathComponent(),withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
   let lock=try FileLease(url:url.deletingLastPathComponent().appendingPathComponent("settings.lock"),nonblocking:false)
@@ -51,6 +57,8 @@ struct Settings: Codable {
   let previous=try Self.load(from:url)
   var stored=self;stored.wallets=previous.wallets
   stored.startMiningAtLogin=startMiningAtLoginChange ?? previous.startMiningAtLogin
+  stored.automaticUpdateChecks=automaticUpdateChecksChange ?? previous.automaticUpdateChecks
+  stored.updateCheckFrequency=updateCheckFrequencyChange ?? previous.updateCheckFrequency
   let changes=walletChanges ?? wallets.merging([coin:address]) { _,new in new }
   for (currency,value) in changes { stored.wallets[currency]=value }
   if !updateDefaultCoin { stored.coin=previous.coin }

@@ -49,6 +49,7 @@ extension MinerApp {
   statusItem.button?.attributedTitle=NSAttributedString(string:"₿",attributes:[.foregroundColor:menuColor(overall),.font:NSFont.systemFont(ofSize:16,weight:.medium)])
   statusItem.button?.toolTip="Idle Miner · \(selected.count) currency instance\(selected.count==1 ? "":"s") · open for per-currency status"
   rootLoginItem?.state=loginItem.state
+  rootUpdateItem?.title=builtInUpdater.menuTitle
  }
  func menuColor(_ level:String)->NSColor { level=="working" ? .systemGreen : level=="issue" ? .systemRed : .systemGray }
  func currencyName(_ coin:String)->String { ["BTC":"Bitcoin (BTC)","LTC":"Litecoin (LTC)","DOGE":"Dogecoin (DOGE)","ETH":"Ethereum (ETH)"][coin] ?? coin }
@@ -79,7 +80,7 @@ extension MinerApp {
   }
   menu.addItem(.separator());_=add("Settings…",#selector(showSettings),key:",",to:menu)
   rootLoginItem=add("Start at Login",#selector(toggleLoginItem),to:menu);rootLoginItem?.state=loginItem.state
-  _=add("Check for Updates…",#selector(checkForUpdates),to:menu)
+  rootUpdateItem=add(builtInUpdater.menuTitle,#selector(checkForUpdates),to:menu)
   _=add("Wallet & Payout Help",#selector(showHelp),to:menu);_=add("About Idle Miner",#selector(showAbout),to:menu)
   menu.addItem(.separator());_=add("Stop All Mining",#selector(stopAllCurrencies),to:menu);_=add("Quit Idle Miner",#selector(quitAllCurrencies),key:"q",to:menu)
   unifiedMenu=menu;statusItem.menu=menu

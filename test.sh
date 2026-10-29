@@ -2,7 +2,7 @@
 set -euo pipefail
 root=${0:A:h}
 zsh "$root/tools/fetch-sparkle.sh"
-common=("$root/Sources/Core.swift" "$root/Sources/ProfileCoordination.swift" "$root/Sources/SessionClock.swift")
+common=("$root/Sources/Core.swift" "$root/Sources/ProfileCoordination.swift" "$root/Sources/SessionClock.swift" "$root/Sources/UpdateCheckSchedule.swift")
 /usr/bin/swiftc -parse-as-library -module-cache-path /private/tmp/miner-swift-cache "${common[@]}" "$root/Tests/CoreTests.swift" -o /private/tmp/miner-core-tests
 /private/tmp/miner-core-tests
 /usr/bin/python3 "$root/Tests/SupervisorTests.py" "$root/Idle Miner.app/Contents/Resources/miner-supervisor"
@@ -47,3 +47,6 @@ IDLE_MINER_STATE=$(mktemp -d /private/tmp/miner-manual.XXXXXX) /private/tmp/mine
 /usr/bin/swiftc -parse-as-library -module-cache-path /private/tmp/miner-swift-cache "$root/Sources/Core.swift" "$root/Sources/ProfileCoordination.swift" "$root/Sources/UpdateResume.swift" "$root/Tests/UpdateResumeTests.swift" -o /private/tmp/miner-resume-tests
 /private/tmp/miner-resume-tests
 /usr/bin/python3 "$root/Tests/UpdateResumeStartupIntegration.py"
+
+/usr/bin/swiftc -parse-as-library -module-cache-path /private/tmp/miner-swift-cache "$root/Sources/Core.swift" "$root/Sources/ProfileCoordination.swift" "$root/Sources/UpdateCheckSchedule.swift" "$root/Tests/AutomaticUpdateTests.swift" -o /private/tmp/miner-automatic-update-tests
+/private/tmp/miner-automatic-update-tests

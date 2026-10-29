@@ -82,6 +82,56 @@ def check_async(callback):
  threading.Thread(target=run,daemon=True).start()
 
 
+class AutomaticUpdates:
+ """One signed discovery per shared interval; never downloads or touches mining.
+
+ The lease spans the request. The attempt is committed before I/O so crashes and
+ service errors cannot make other currencies retry. Boottime survives suspend
+ and keeps a wall-clock rollback from causing extra checks in the same boot.
+ """
+ def __init__(self,state):
+  from coordination import SettingsStore
+  self.state=Path(state);self.store=SettingsStore(self.state);self.path=self.state/'automatic-updates.json'
+ def _load(self):
+  try:
+   data=json.loads(self.path.read_text())
+   return data if isinstance(data,dict) else {}
+  except (OSError,ValueError):return {}
+ def available(self,version,build):
+  try:
+   release=self._load().get('available')
+   return release if release and newer(release['version'],release['build'],version,build) else None
+  except (ValueError,TypeError,KeyError):return None
+ def run_once(self,version,build,wall=None,uptime=None,boot=None):
+  from coordination import atomic
+  from core import now
+  try:
+   # No lock or state file is created while the opt-in is disabled.
+   if not self.store.load()['automatic_update_checks']:return None
+   with open(self.state/'automatic-updates.lock','a') as lease:
+    try:fcntl.flock(lease,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except BlockingIOError:return None
+    settings=self.store.load()
+    if not settings['automatic_update_checks']:return None
+    wall=time.time() if wall is None else wall;uptime=now() if uptime is None else uptime
+    if boot is None:boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+    data=self._load();interval=86400 if settings['update_check_frequency']=='daily' else 604800
+    previous=data.get('lastAttempt')
+    if isinstance(previous,(int,float)):
+     elapsed=max(0,wall-previous)
+     if data.get('boot')==boot and isinstance(data.get('uptime'),(int,float)):elapsed=max(elapsed,uptime-data['uptime'])
+     if elapsed<interval:return None
+    data.update(lastAttempt=wall,uptime=uptime,boot=boot);atomic(self.path,data)
+    release=fetch_manifest() # Ed25519 manifest authentication is mandatory here.
+    if not self.store.load()['automatic_update_checks'] or not newer(release['version'],release['build'],version,build):return None
+    install_metadata(release)
+    identity=dict(version=release['version'],build=release['build'])
+    prior=data.get('notified');notify=not prior or newer(identity['version'],identity['build'],prior['version'],prior['build'])
+    if notify:data['notified']=identity;data['available']=identity
+    atomic(self.path,data);return dict(release=identity,notify=notify)
+  except Exception:return None # Automatic failures are intentionally silent.
+
+
 def install_metadata(release):
  """Fail closed before network/build activity if signing metadata is unavailable."""
  if not isinstance(release,dict) or not safe_url(release.get('url')):raise ValueError('Invalid update URL')

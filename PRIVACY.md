@@ -1,6 +1,6 @@
 # Privacy and network connections
 
-This describes Idle Miner **1.9.2 (build 14)**. Idle Miner runs locally and does not require an Idle Miner account. The app source contains no developer-operated analytics or telemetry service. Its mining and reporting features contact the third parties below; those services can observe your connection's IP address and the data sent to them.
+This describes Idle Miner **1.9.3 (build 15)**. Idle Miner runs locally and does not require an Idle Miner account. The app source contains no developer-operated analytics or telemetry service. Its mining and reporting features contact the third parties below; those services can observe your connection's IP address and the data sent to them.
 
 ## Wallet addresses
 
@@ -12,7 +12,7 @@ Saving a valid address on Mac allows the app to fetch unMineable statistics auto
 
 | Service | Purpose and information sent |
 | --- | --- |
-| Idle Miner website, `idleminer.app` (Cloudflare hosting) | Choosing **Check for Updates…** fetches the signed release feed over HTTPS (Mac appcast; Linux manifest and detached signature). Selecting **Download and Install Now** downloads the signed platform package from the same host. Release notes appear inside the update window. The update request contains no wallet address, balance, mining log, or saved settings. Cloudflare can observe ordinary connection information, including IP address and request headers. Checks are user-invoked, with no automatic background checks. Installation requires choosing **Download and Install Now**. |
+| Idle Miner website, `idleminer.app` (Cloudflare hosting) | Choosing **Check for Updates…** fetches the signed release feed over HTTPS (Mac appcast; Linux manifest and detached signature). Selecting **Download and Install Now** downloads the signed platform package from the same host. Release notes appear inside the update window. The update request contains no wallet address, balance, mining log, or saved settings. Cloudflare can observe ordinary connection information, including IP address and request headers. Checks are manual by default. If you enable **Automatically check for updates**, a signed availability check runs daily or weekly while Idle Miner is open; it does not download an installer or pause mining. Native update notifications follow system permissions and settings. Installation requires choosing **Download and Install Now**. |
 | Coinbase, `api.coinbase.com` | HTTPS GET requests for the selected currency's USD spot price. The wallet address is not included in this query. |
 | unMineable, `api.unmineable.com` | HTTPS GET requests containing the public Receive address and selected currency, followed by account-statistics requests using the returned account identifier. Mac also requests worker information. |
 | unMineable mining pool, `rx.unmineable.com:443` | TLS-protected Stratum mining connection. The pool login contains the currency, public Receive address, and a worker label (`IdleMiner` on Mac or `IdleMinerLinux` on Linux). The engine sends accepted-work submissions and receives mining jobs. |
@@ -44,3 +44,7 @@ A payout is handled by the provider and receiving wallet/exchange, not by Idle M
 ## Restoring mining after updates
 
 Version 1.9.1 stores a short-lived, private local handoff containing currency identifiers and whether mining was enabled before an update. It contains no receive addresses, passwords, keys or recovery phrases and is not sent to the website. A successful update restart consumes it once. Manually stopped currencies stay stopped; resumed currencies still use the saved limits and safety rules. Ordinary manual openings stay stopped, and actual sign-ins follow the login settings.
+
+## Optional update notifications
+
+Automatic checks are off by default. The shared local scheduler records attempt times and release version/build identifiers to avoid duplicate checks and alerts across currency instances. It stores no wallet data. macOS notification permission is requested only after you enable the option. Available releases remain visible in the menu when notifications are unavailable. Notification text contains the release version only.

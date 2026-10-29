@@ -1,4 +1,4 @@
-IDLE MINER 1.9.2 (BUILD 14) FOR LINUX
+IDLE MINER 1.9.3 (BUILD 15) FOR LINUX
 By Jeffry Zander
 
 INSTALL
@@ -80,6 +80,18 @@ The offline test uses
 one thread for up to 70 seconds, connects to no pool and earns nothing.
 
 UPDATES
+Below the login settings, Automatically check for updates is optional and OFF
+by default. Enable it and choose Daily (24 hours) or Weekly (7 days). The same
+controls appear in Check for Updates; both take effect immediately and stay
+synchronized across currency windows. Cancel does not undo these controls.
+Checks happen only while the app is running, including a due check when you
+enable it. All currency windows share one persisted schedule and notify once
+for each newer signed release. Errors and current releases stay silent.
+A supported desktop tray shows a notification; an Update Available menu item
+remains available if desktop notifications are unavailable or suppressed.
+Automatic checks never download, install, stop mining or open a dialog.
+Changing this preference never changes wallets or login/mining preferences.
+
 Check for Updates shows the installed and latest versions and status. When
 up to date, optional Release Notes start collapsed; click to expand or hide
 them. Notes stay hidden while checking or after an error. A newer signed
@@ -107,7 +119,8 @@ without a valid update receipt stay stopped. Actual OS login follows the
 separate Start at Login and Start Mining preference in Settings.
 
 Update checks contact https://idleminer.app/updates/stable.json and its
-Ed25519 signature only when requested, at most once every 30 seconds. The
+Ed25519 signature for manual checks (throttled to once every 30 seconds),
+or for optional Daily/Weekly checks while the app is open. The
 release signature, exact archive length, and SHA-256 checksum are verified
 before any downloaded installer code runs. Release notes display as plain
 text. Unsigned, modified, and older releases cannot be installed.

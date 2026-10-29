@@ -19,6 +19,7 @@ import AppKit
  var sharedCurrencyRows=[String:NSMenuItem]()
  var sharedRemoteSummaries=[String:MenuSummary]()
  var rootLoginItem:NSMenuItem?
+ var rootUpdateItem:NSMenuItem?
  var sharedMenuSignature=""
  var sharedMenuTracking=false
  var currencyMenus=[NSMenu]()
@@ -65,6 +66,7 @@ import AppKit
  var statsWindow:StatsWindow?
  func environmentSample()->Environment { sensors.sample() }
  var engineResources:URL { Bundle.main.resourceURL! }
+ var automaticUpdateNetworkingEnabled:Bool { statisticsNetworkingEnabled && Bundle.main.bundleURL.pathExtension=="app" }
  var statisticsNetworkingEnabled:Bool { Bundle.main.bundleIdentifier=="local.jeff.idleminer" }
  let priceItem=NSMenuItem(title:"Coin price · loading…",action:nil,keyEquivalent:"")
  let balanceItem=NSMenuItem(title:"Pool balance · checking…",action:nil,keyEquivalent:"")
@@ -73,6 +75,9 @@ import AppKit
  var loginItem:NSMenuItem!
  var loginApprovalItem:NSMenuItem!
  let loginCheck=NSButton(checkboxWithTitle:"Start at Login",target:nil,action:nil)
+ let automaticUpdateCheck=NSButton(checkboxWithTitle:"Automatically check for updates",target:nil,action:nil)
+ let automaticUpdateFrequency=NSPopUpButton()
+ let automaticUpdateHint=NSTextField(wrappingLabelWithString:"Checks run while Idle Miner is open. Notifications follow macOS settings; the menu also shows available updates. You choose when to install.")
  let loginMiningCheck=NSButton(checkboxWithTitle:"Start at Login and Start Mining configured currencies",target:nil,action:nil)
  let loginHint=NSTextField(wrappingLabelWithString:"")
  let loginApprovalButton=NSButton(title:"Open Login Items…",target:nil,action:nil)
@@ -247,6 +252,7 @@ import AppKit
   drainSharedMenuCommands()
   guard !quitting else { return }
   refreshSharedSettings()
+  builtInUpdater.pollAutomaticChecks()
   sessionClock.sample(hashing:engine.ready && !engine.isStopping && !engine.isChanging && (localStats.currentRate() ?? 0)>0)
   if statisticsNetworkingEnabled { statsService.refresh(coin:settings.coin,address:settings.address) }
   defer { updateStatistics() }
@@ -343,8 +349,8 @@ import AppKit
     if secondary { field.textColor = .secondaryLabelColor }
     stack.addArrangedSubview(field); field.widthAnchor.constraint(equalTo:stack.widthAnchor).isActive=true
    }
-   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.9.2"
-   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "14"
+   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.9.3"
+   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "15"
    centered("Idle Miner",size:24,bold:true)
    centered("By Jeffry Zander",size:14)
    centered("Version \(version) (\(build))",secondary:true)
@@ -376,7 +382,7 @@ import AppKit
   for (currency,field) in walletFields { field.stringValue=settings.wallets[currency] ?? (settings.coin==currency ? settings.address : "") }
   dockCheck.state=settings.showDock ? .on : .off;menuBarCheck.state=settings.showMenuBar ? .on : .off
   threadsField.selectItem(withTag:settings.idleThreads); activeCheck.state=settings.pauseWhileActive ? .on : .off
-  formError.stringValue=""; updateGuidance(); refreshLoginItem()
+  formError.stringValue=""; updateGuidance(); refreshLoginItem();synchronizeAutomaticUpdateControls()
   NSApp.activate(ignoringOtherApps:true); window?.makeKeyAndOrderFront(nil)
   window?.makeFirstResponder(walletField)
  }
@@ -407,11 +413,35 @@ import AppKit
   loginMiningCheck.target=self;loginMiningCheck.action=#selector(toggleLoginMining);row(loginMiningCheck)
   loginHint.font = .systemFont(ofSize:12);loginHint.textColor = .secondaryLabelColor;row(loginHint)
   loginApprovalButton.target=self;loginApprovalButton.action=#selector(openLoginSettings);loginApprovalButton.isHidden=true;stack.addArrangedSubview(loginApprovalButton)
+  automaticUpdateCheck.target=self;automaticUpdateCheck.action=#selector(automaticUpdateSettingsChanged(_:));row(automaticUpdateCheck)
+  automaticUpdateFrequency.addItems(withTitles:["Daily","Weekly"]);automaticUpdateFrequency.target=self;automaticUpdateFrequency.action=#selector(automaticUpdateSettingsChanged(_:));row(automaticUpdateFrequency)
+  automaticUpdateHint.font = .systemFont(ofSize:12);automaticUpdateHint.textColor = .secondaryLabelColor;row(automaticUpdateHint)
   row(label("Each currency uses a separate mining dataset (about 2 GB). Running instances share the total thread limit and reserve two CPU cores where possible. Active-use, battery, sleep, heat and memory protections still apply. Keep a Dock or menu bar icon enabled."))
   formError.textColor = .systemRed;formError.font = .systemFont(ofSize:12);row(formError)
   let buttons=NSStackView();buttons.orientation = .horizontal;buttons.spacing=12
   buttons.addArrangedSubview(NSButton(title:"Wallet & Payout Help",target:self,action:#selector(showHelp)))
   let save=NSButton(title:"Save Settings",target:self,action:#selector(saveSettings));save.keyEquivalent="\r";buttons.addArrangedSubview(save);stack.addArrangedSubview(buttons)
+ }
+ func synchronizeAutomaticUpdateControls() {
+  automaticUpdateCheck.state=settings.automaticUpdateChecks ? .on:.off
+  automaticUpdateFrequency.selectItem(withTitle:settings.updateCheckFrequency=="weekly" ? "Weekly":"Daily")
+  automaticUpdateFrequency.isEnabled=settings.automaticUpdateChecks
+  builtInUpdater.configurePreferences()
+ }
+ @objc func automaticUpdateSettingsChanged(_ sender:NSControl) {
+  if sender === automaticUpdateCheck { setAutomaticUpdatePreferences(enabled:automaticUpdateCheck.state == .on,frequency:nil) }
+  else { setAutomaticUpdatePreferences(enabled:nil,frequency:automaticUpdateFrequency.titleOfSelectedItem=="Weekly" ? "weekly":"daily") }
+ }
+ func setAutomaticUpdatePreferences(enabled:Bool?,frequency:String?) {
+  do {
+   let previous=try Settings.load(from:settingsURL)
+   var next=previous;next.automaticUpdateChecks=enabled ?? previous.automaticUpdateChecks;next.updateCheckFrequency=frequency ?? previous.updateCheckFrequency
+   try next.save(to:settingsURL,walletChanges:[:],updateDefaultCoin:false,automaticUpdateChecksChange:enabled,updateCheckFrequencyChange:frequency)
+   // Preserve the normal wallet-change safety path if another currency edited
+   // a receive address while this preferences window was open.
+   lastSettingsData=nil;refreshSharedSettings();synchronizeAutomaticUpdateControls()
+   builtInUpdater.preferencesChanged(requestNotifications:enabled==true && !previous.automaticUpdateChecks)
+  } catch { formError.stringValue=error.localizedDescription;synchronizeAutomaticUpdateControls() }
  }
  @objc func coinChanged() { updateGuidance();formError.stringValue="Saving selects this currency and stops the current session." }
  func updateGuidance() {

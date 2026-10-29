@@ -11,7 +11,7 @@ from startup import startup_plan,autostart_enabled,login_entry,save_login_prefer
 from platform_linux import Sensors
 from network import Network
 from shared_tray import SharedTray,profile_currency,focus_matches
-from updates import check_async,newer,install_metadata,prepare_update,UpdateCancelled,request_shutdown,begin_resume,acknowledge_resume,consume_resume,discard_resume,installed_version
+from updates import AutomaticUpdates,check_async,newer,install_metadata,prepare_update,UpdateCancelled,request_shutdown,begin_resume,acknowledge_resume,consume_resume,discard_resume,installed_version
 ROOT=Path(__file__).resolve().parent
 STATE=Path(os.environ.get('IDLE_MINER_STATE',str(Path.home()/'.config/idle-miner')))
 PROFILE=next((arg.split('=',1)[1] for arg in sys.argv if arg.startswith('--profile=')),'default')
@@ -21,6 +21,7 @@ def profile_conflict_message(coin,current):
  return f'The {coin} profile is currently showing {current}. Use Switch Currency in that window, or quit that profile, before opening {coin}.' if current else 'This currency profile is busy and has not reported its current currency. Try again in a moment.'
 
 class UpdateBridge(QObject):
+ automatic=Signal(object)
  ready=Signal(object)
  progress=Signal(str)
  prepared=Signal(object)
@@ -88,6 +89,8 @@ class Window(QMainWindow):
   self.tray_menu.aboutToShow.connect(self.rebuild_tray_menu);self.rebuild_tray_menu()
   self.tray.setContextMenu(self.tray_menu);self.tray.activated.connect(lambda reason:self.showNormal() if reason==QSystemTrayIcon.ActivationReason.Trigger else None)
   self.last_color=None;self.apply_visibility()
+  self.automatic_updates=AutomaticUpdates(STATE);self.automatic_busy=False;self.update_bridge.automatic.connect(self.scheduled_update_result)
+  self.automatic_timer=QTimer(self);self.automatic_timer.timeout.connect(self.scheduled_update_tick);self.automatic_timer.start(60000);QTimer.singleShot(0,self.scheduled_update_tick)
   self.timer=QTimer(self);self.timer.timeout.connect(self.tick);self.timer.start(1000);self.tick()
  def populate(self,menu):
   for title,fn in [('Mining Stats',self.show_stats),('Start Mining',self.start),('Stop Mining',self.stop)]:menu.addAction(title,fn)
@@ -102,7 +105,7 @@ class Window(QMainWindow):
    currencies.addAction(coin,lambda c=coin:self.switch_currency(c))
    another.addAction(coin,lambda c=coin:self.open_currency(c))
   menu.addAction('Engine Log',self.show_log);menu.addAction('Refresh Stats',lambda:self.refresh(True));menu.addAction('Pool Payouts',self.open_pool)
-  menu.addAction('Check for Updates…',self.check_updates);menu.addAction('About Idle Miner',self.about);menu.addSeparator();menu.addAction('Quit This Currency',self.quit);menu.addAction('Quit Idle Miner',self.quit_all)
+  update=menu.addAction('Check for Updates…',self.check_updates);menu.aboutToShow.connect(lambda:update.setText(self.update_menu_title()));menu.addAction('About Idle Miner',self.about);menu.addSeparator();menu.addAction('Quit This Currency',self.quit);menu.addAction('Quit Idle Miner',self.quit_all)
  def show_log(self):self.tabs.setCurrentIndex(1);self.showNormal();self.raise_();self.activateWindow()
  def show_stats(self):self.tabs.setCurrentIndex(0);self.showNormal();self.raise_();self.activateWindow()
  def start(self):
@@ -289,7 +292,7 @@ class Window(QMainWindow):
    menu.aboutToShow.connect(lambda c=coin,m=menu:self.populate_currency(m,c))
    menu.setIcon(self.status_icon(rows[coin]['color'] if coin in rows else 'gray'));self.populate_currency(menu,coin)
   self.tray_menu.addSeparator();self.tray_menu.addAction('Settings…',self.settings_dialog)
-  self.tray_menu.addAction('Check for Updates…',self.check_updates);self.tray_menu.addAction('About Idle Miner',self.about)
+  self.tray_menu.addAction(self.update_menu_title(),self.check_updates);self.tray_menu.addAction('About Idle Miner',self.about)
   self.tray_menu.addSeparator();self.tray_menu.addAction('Quit Idle Miner',self.quit_all)
  def populate_currency(self,menu,coin):
   menu.clear();row=self.shared_tray.snapshots().get(coin)
@@ -328,6 +331,52 @@ class Window(QMainWindow):
   if now()>=self.quit_deadline:
    self.quit_group=None;self.show_stats();QMessageBox.warning(self,'A currency is still stopping','Wait for the remaining currency to stop, then try Quit Idle Miner again.');return
   QTimer.singleShot(250,self.check_quit_all)
+ def update_menu_title(self):
+  release=self.automatic_updates.available(VERSION,BUILD) if hasattr(self,'automatic_updates') else None
+  return f"Update Available: {release['version']} ({release['build']})…" if release else 'Check for Updates…'
+ def scheduled_update_tick(self):
+  if self.quitting or self.automatic_busy or self.update_busy or self.update_preparing:return
+  try:
+   if not self.store.load()['automatic_update_checks']:return
+  except Exception:return
+  self.automatic_busy=True
+  def discover():
+   result=self.automatic_updates.run_once(VERSION,BUILD)
+   self.update_bridge.automatic.emit(result)
+  threading.Thread(target=discover,daemon=True).start()
+ def scheduled_update_result(self,result):
+  self.automatic_busy=False
+  if self.quitting or not result:return
+  try:
+   if not self.store.load()['automatic_update_checks']:return
+  except Exception:return
+  if result['notify']:self.notify_available_update(result['release'])
+ def notify_available_update(self,release):
+  title='Idle Miner Update Available';message=f"Idle Miner {release['version']} ({release['build']}) is available. Choose Check for Updates to review and install."
+  if self.tray.isVisible() and QSystemTrayIcon.supportsMessages():
+   self.tray.showMessage(title,message,QSystemTrayIcon.MessageIcon.Information,10000);return
+  # Desktops without supported tray notifications retain the available-update
+  # hint in the app and tray menus; discovery never opens or activates a window.
+ def automatic_update_controls(self,parent):
+  widget=QWidget(parent);layout=QVBoxLayout(widget);layout.setContentsMargins(0,6,0,0);layout.setSpacing(4)
+  row=QHBoxLayout();check=QCheckBox('Automatically check for updates');check.setObjectName('automaticUpdateChecks');frequency=QComboBox();frequency.setObjectName('automaticUpdateFrequency');frequency.addItem('Daily','daily');frequency.addItem('Weekly','weekly');row.addWidget(check);row.addStretch();row.addWidget(frequency);layout.addLayout(row)
+  hint=QLabel('Checks only while Idle Miner is running. New updates notify you; downloading and installing are always your choice.');hint.setWordWrap(True);layout.addWidget(hint)
+  error=QLabel();error.setWordWrap(True);error.hide();layout.addWidget(error)
+  def save(key,value):
+   try:
+    baseline=self.store.load();saved=self.store.save({**baseline,key:value},baseline)
+    for name in ('automatic_update_checks','update_check_frequency'):self.settings[name]=saved[name]
+    error.hide();self.sync_automatic_controls(widget);self.scheduled_update_tick()
+   except Exception as exc:error.setText(str(exc));error.show();self.sync_automatic_controls(widget)
+  check.clicked.connect(lambda enabled:save('automatic_update_checks',enabled));frequency.currentIndexChanged.connect(lambda _:save('update_check_frequency',frequency.currentData()))
+  timer=QTimer(widget);timer.timeout.connect(lambda:self.sync_automatic_controls(widget));timer.start(1000);self.sync_automatic_controls(widget)
+  return widget
+ def sync_automatic_controls(self,parent):
+  try:settings=self.store.load()
+  except Exception:return
+  check=parent.findChild(QCheckBox,'automaticUpdateChecks');frequency=parent.findChild(QComboBox,'automaticUpdateFrequency')
+  if not check or not frequency:return
+  check.blockSignals(True);frequency.blockSignals(True);check.setChecked(settings['automatic_update_checks']);frequency.setCurrentIndex(frequency.findData(settings['update_check_frequency']));frequency.setEnabled(settings['automatic_update_checks']);check.blockSignals(False);frequency.blockSignals(False)
  def check_updates(self):
   if self.update_preparing:
    if self.update_dialog:self.update_dialog.show();self.update_dialog.raise_()
@@ -336,11 +385,13 @@ class Window(QMainWindow):
   if self.update_dialog and self.update_dialog.isVisible():self.update_dialog.raise_();return
   if now()-self.update_last<30:QMessageBox.information(self,'Check for Updates','Please wait a moment before checking again.');return
   self.update_cancel=threading.Event();self.update_release=None
-  dialog=QDialog(self);dialog.setWindowTitle('Check for Updates');dialog.setMinimumWidth(520);layout=QVBoxLayout(dialog)
+  dialog=QDialog(self);dialog.setWindowTitle('Check for Updates');dialog.setMinimumWidth(520);layout=QVBoxLayout(dialog);layout.setContentsMargins(20,18,20,16);layout.setSpacing(10)
+  header=QHBoxLayout();brand=QLabel();brand.setObjectName('updateBrandIcon');brand.setPixmap(QIcon(str(ROOT/'icon.png')).pixmap(48,48));header.addWidget(brand);heading=QLabel('Idle Miner Updates');heading.setObjectName('updateBrandTitle');font=QFont(QApplication.font());font.setPointSize(17);font.setBold(True);heading.setFont(font);header.addWidget(heading);header.addStretch();layout.addLayout(header)
   self.update_versions=QLabel(f'Installed: Idle Miner {VERSION} ({BUILD})\nLatest: checking…');layout.addWidget(self.update_versions)
   self.update_status=QLabel('Checking for updates…');self.update_status.setTextFormat(Qt.TextFormat.PlainText);self.update_status.setWordWrap(True);layout.addWidget(self.update_status)
   self.update_notes_toggle=QToolButton();self.update_notes_toggle.setText('Release Notes');self.update_notes_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon);self.update_notes_toggle.setCheckable(True);self.update_notes_toggle.setArrowType(Qt.ArrowType.RightArrow);self.update_notes_toggle.toggled.connect(self.toggle_update_notes);layout.addWidget(self.update_notes_toggle);self.update_notes_toggle.hide()
   self.update_notes=QPlainTextEdit();self.update_notes.setReadOnly(True);layout.addWidget(self.update_notes);self.update_notes.hide()
+  layout.addWidget(self.automatic_update_controls(dialog))
   row=QHBoxLayout();row.addStretch();close=QPushButton('Close');close.clicked.connect(dialog.reject);row.addWidget(close)
   self.update_install=QPushButton('Download and Install Now');self.update_install.setEnabled(False);self.update_install.hide();self.update_install.clicked.connect(self.install_update);row.addWidget(self.update_install);layout.addLayout(row)
   dialog.finished.connect(lambda _:self.update_cancel.set());self.update_dialog=dialog;dialog.adjustSize();dialog.show()
@@ -502,6 +553,7 @@ class Window(QMainWindow):
    self.set_login_mining(enabled);mine.setChecked(autostart_enabled(AUTOSTART) and self.store.load()['start_mining_at_login'])
   mine.clicked.connect(toggle_mining)
   for label,widget in [('Shared maximum idle / boost threads',count),('',pause),('',stats),('',dock),('',tray),('',login),('',mine)]:form.addRow(label,widget)
+  form.addRow(self.automatic_update_controls(dialog))
   note=QLabel('Save each currency’s public Receive address on its native network. ETH payouts use Ethereum (ETH); choose that same network in your wallet and at unMineable. A 0x address alone cannot identify its network. No password, seed phrase or private key is needed.\n\nUse Switch Currency or Open Another Currency from the menu. All running currencies share this thread budget and reserve two CPU cores where possible. Each needs about 3 GB free memory to start.\n\nKeep at least one visibility option selected. Desktops without a usable tray always keep a window visible. Start at Login opens stopped unless you also opt in to start mining every currency with a valid saved wallet. Both login checkboxes take effect immediately. Manual launches open stopped. Saving settings stops this session.');note.setWordWrap(True);form.addRow(note)
   error=QLabel();error.setWordWrap(True);form.addRow(error)
   buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Save|QDialogButtonBox.StandardButton.Cancel);form.addRow(buttons);buttons.rejected.connect(dialog.reject)

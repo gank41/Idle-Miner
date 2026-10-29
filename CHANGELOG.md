@@ -1,5 +1,9 @@
 # Changes
 
+## 1.9.3 — build 15
+
+Optional Daily/Weekly signed update checks notify when a new release is available while Idle Miner is open. Checks default off, coordinate across currency instances and never download, install or pause mining. Settings and the updater share selective preference controls. The branded Mac update window follows native light/dark appearance and keeps current-version notes collapsed. See [release notes](docs/releases/v1.9.3.md).
+
 ## 1.9.2 — build 14
 
 Up-to-date checks now open a compact window with the installed/latest versions, a short status, and Close. Optional Release Notes expand or collapse on demand. Available updates still show their changes before installation. This applies to Mac and Linux and preserves existing signed installation and currency restoration. See [release notes](docs/releases/v1.9.2.md).

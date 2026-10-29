@@ -48,7 +48,7 @@ for (const directory of previousDirectories) {
 if (manifest.build > 11 && !previousReleases.has('1.8')) throw new Error('Keep immutable v1.8 download URLs: supply --previous-release-dir for the original audited 1.8 release.');
 await mkdir(output, { recursive: false });
 const copy = async (source, destination) => { await mkdir(dirname(destination), { recursive: true }); await copyFile(source, destination); };
-for (const name of ['index.html', 'site.css', '_headers', '_redirects']) await copy(join(root, 'docs', name), join(output, name));
+for (const name of ['index.html', '404.html', 'site.css', '_headers', '_redirects']) await copy(join(root, 'docs', name), join(output, name));
 for (const name of await readdir(join(root, 'docs/assets'))) {
   if (/^[a-zA-Z0-9_.-]+\.(png|svg|webp|jpg|ico)$/.test(name)) await copy(join(root, 'docs/assets', name), join(output, 'assets', name));
 }

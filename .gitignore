@@ -20,6 +20,7 @@
 # Keep internal project plans and relocation records local.
 /docs/*
 !/docs/index.html
+!/docs/404.html
 !/docs/site.css
 !/docs/site.js
 !/docs/.nojekyll

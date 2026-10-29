@@ -59,6 +59,9 @@ try {
   const baseArgs = ['--release-dir', current, '--manifest', manifestPath, '--public-key-file', keyPath, '--previous-release-dir', previous];
   const output = join(fixture, 'site');
   await execute('build-site.mjs', [...baseArgs, '--output', output]);
+  assert.match(await readFile(join(output, '_headers'), 'utf8'), /\/downloads\/\*\n  Cache-Control: no-store/, 'Missing download URLs must not acquire year-long cached website fallbacks');
+  await assert.doesNotReject(() => readFile(join(output, '404.html')), 'A real static 404 must disable Pages SPA fallback for missing artifacts');
+  count += 2;
   assert.deepEqual(await readFile(join(output, 'updates/stable.json')), manifestBytes);
   assert.deepEqual(await readFile(join(output, 'updates/appcast.xml')), appcastBytes);
   for (const name of releaseFiles('1.8')) assert.deepEqual(await readFile(join(output, 'downloads/v1.8', name)), await readFile(join(previous, name)));

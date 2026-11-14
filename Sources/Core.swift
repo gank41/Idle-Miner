@@ -251,6 +251,9 @@ enum EthereumAddress {
 enum StartupPlan {
  static func currencies(_ settings:Settings,loginLaunch:Bool,loginEnabled:Bool,profile:String="default")->[String] {
   guard loginLaunch,loginEnabled,settings.startMiningAtLogin,profile=="default" else { return [] }
+  return configuredCurrencies(settings)
+ }
+ static func configuredCurrencies(_ settings:Settings)->[String] {
   let ordered=[settings.coin]+Settings.coins.filter{$0 != settings.coin}
   return ordered.filter { Wallet.valid(settings.wallets[$0] ?? ($0==settings.coin ? settings.address : ""),coin:$0) }
  }

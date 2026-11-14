@@ -1,4 +1,4 @@
-IDLE MINER 1.9.3 (BUILD 15) FOR LINUX
+IDLE MINER 1.9.4 (BUILD 16) FOR LINUX
 By Jeffry Zander
 
 INSTALL
@@ -117,6 +117,11 @@ states, so that first transition reopens stopped. Automatic restoration applies
 to subsequent successful updates initiated by 1.9.1 or later. Manual launches
 without a valid update receipt stay stopped. Actual OS login follows the
 separate Start at Login and Start Mining preference in Settings.
+
+In the Idle Miner window menu or tray menu, Start All Mining enables
+every currency with a valid saved receive address. Stop All Mining stops
+all currency instances. All instances share your CPU budget and apply
+the usual idle, power, temperature and memory rules.
 
 Update checks contact https://idleminer.app/updates/stable.json and its
 Ed25519 signature for manual checks (throttled to once every 30 seconds),

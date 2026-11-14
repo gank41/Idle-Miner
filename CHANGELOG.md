@@ -1,5 +1,9 @@
 # Changes
 
+## 1.9.4 — build 16
+
+Start All Mining in the Mac and Linux menus enables mining for each currency with a valid saved wallet. Stop All Mining also cancels pending group launches. Linux gains group stop in its window and tray menus and can open a missing currency when its usual process slot is occupied. Tray refreshes reuse unchanged icons. See [release notes](docs/releases/v1.9.4.md).
+
 ## 1.9.3 — build 15
 
 Optional Daily/Weekly signed update checks notify when a new release is available while Idle Miner is open. Checks default off, coordinate across currency instances and never download, install or pause mining. Settings and the updater share selective preference controls. The branded Mac update window follows native light/dark appearance and keeps current-version notes collapsed. See [release notes](docs/releases/v1.9.3.md).

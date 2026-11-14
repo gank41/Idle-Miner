@@ -10,6 +10,13 @@ npm install --prefix Deployment
 
 ## Prepare and sign a release
 
+Use `Installers/CURRENT/` for the complete current release set. Before preparing
+a new version, move the previous complete set to
+`Installers/OLD/Releases/Cloudflare-VERSION/` without changing its bytes. Historical
+packages and draft builds belong under `Installers/OLD/`; the entire installer
+archive remains excluded from Git. See [Building Idle Miner](../BUILDING.md#release-packages).
+Temporary signed feeds and website staging remain outside the source tree.
+
 Prepare the final audited release directory with these exact names for version 1.9.3: `Idle-Miner-1.9.3-macOS.dmg`, `Idle-Miner-1.9.3-Linux.tar.gz`, `Idle-Miner-1.9.3-source.tar.gz`, `Idle-Miner-How-To.md`, `LICENSE.txt`, and `SHA256SUMS.txt`. The checksum file must cover exactly the other five files with standard SHA-256 lines. Each asset must be nonempty and strictly smaller than Cloudflare Pages' 25 MiB per-file limit. Package, sign, and finish every archive before creating update feeds; changing an archive afterward invalidates the feed.
 
 The Mac update framework and official tools are Sparkle **2.10.1** in `Vendor/Sparkle`. The update-signing private key lives only in the login Keychain under account `local.jeff.idleminer.updates`. Use Sparkle's official `generate_keys --account local.jeff.idleminer.updates` to initialize or inspect the account, and `-p` to print only its public key. Never use key export or put private keys in files, scripts, logs, source archives, or staging. Pin the matching public key in `macOS/Info.plist` (`SUPublicEDKey`) and `Linux/update_public_key.txt`. Mac requires signed appcasts with `SURequireSignedFeed` enabled. Apple Developer ID signing and notarization are separate checks and must be reported from the final artifact's actual verification results.
@@ -19,7 +26,7 @@ Write release notes to a separate UTF-8 **plain-text** file: 1–12000 character
 ```sh
 node Deployment/create-update-feeds.mjs \
   --version 1.9.3 --build 15 \
-  --release-dir /path/to/Idle-Miner-1.9.3-release \
+  --release-dir /path/to/Idle-Miner/Installers/CURRENT \
   --notes-file /path/to/1.9.3-update-notes.txt \
   --output /tmp/idleminer-feeds-1.9.3
 ```
@@ -34,12 +41,12 @@ Keep old release URLs immutable. Supply the original audited 1.8 release directo
 
 ```sh
 node Deployment/build-site.mjs \
-  --release-dir /path/to/Idle-Miner-1.9.3-release \
+  --release-dir /path/to/Idle-Miner/Installers/CURRENT \
   --manifest /tmp/idleminer-feeds-1.9.3/stable.json \
-  --previous-release-dir /path/to/Idle-Miner/Releases/Cloudflare-1.8 \
-  --previous-release-dir /path/to/Idle-Miner/Releases/Cloudflare-1.9 \
-  --previous-release-dir /path/to/Idle-Miner/Releases/Cloudflare-1.9.1 \
-  --previous-release-dir /path/to/Idle-Miner/Releases/Cloudflare-1.9.2 \
+  --previous-release-dir /path/to/Idle-Miner/Installers/OLD/Releases/Cloudflare-1.8 \
+  --previous-release-dir /path/to/Idle-Miner/Installers/OLD/Releases/Cloudflare-1.9 \
+  --previous-release-dir /path/to/Idle-Miner/Installers/OLD/Releases/Cloudflare-1.9.1 \
+  --previous-release-dir /path/to/Idle-Miner/Installers/OLD/Releases/Cloudflare-1.9.2 \
   --output /tmp/idleminer-site-v1.9.3
 ```
 

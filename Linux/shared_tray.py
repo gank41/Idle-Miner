@@ -8,7 +8,7 @@ from pathlib import Path
 from core import COINS, DURATIONS
 
 PROFILES=('default',*COINS)
-ACTIONS=frozenset(('show_stats','show_log','start','stop','end_boost','settings','pool','refresh','quit',*(f'boost:{m}' for m in DURATIONS)))
+ACTIONS=frozenset(('show_stats','show_log','start','start_configured','stop','end_boost','settings','pool','refresh','quit',*(f'boost:{m}' for m in DURATIONS)))
 FRESH_SECONDS=6
 MAX_BYTES=16384
 
@@ -141,6 +141,16 @@ class SharedTray:
     if valid_action(data.get('action')):actions.append((data['time'],{'stop':1,'quit':2,'quit-update':2}.get(data['action'].split(':',1)[0],0),path.name,data['action']))
    except (OSError,ValueError,TypeError):continue
   self.prune();return [entry[3] for entry in sorted(actions)]
+ def record_stop_all(self):
+  write_json(self.directory/'stop-all.json',{'time':time.time()})
+ def permits_group_launch(self,requested):
+  if not fresh(requested,30):return False
+  try:
+   data=read_json(self.directory/'stop-all.json')
+   cutoff=data.get('time')
+   return type(cutoff) in (int,float) and math.isfinite(cutoff) and requested>cutoff
+  except FileNotFoundError:return True
+  except (OSError,ValueError):return False
  def close(self):
   if self.closed:return
   self.path.unlink(missing_ok=True)

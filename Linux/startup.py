@@ -6,10 +6,13 @@ def startup_plan(settings,profile,args,login_enabled):
     if profile!='default':
         return (profile,()) if '--start-mining' in args and valid_wallet(settings['wallets'].get(profile,''),profile) else (None,())
     if '--login-startup' not in args or not login_enabled or not settings['start_mining_at_login']:return None,()
-    coins=[coin for coin in COINS if valid_wallet(settings['wallets'].get(coin,''),coin)]
+    coins=configured_currencies(settings)
     if not coins:return None,()
     selected=settings['coin'] if settings['coin'] in coins else coins[0]
     return selected,tuple(coin for coin in coins if coin!=selected)
+
+def configured_currencies(settings):
+    return [coin for coin in COINS if valid_wallet(settings['wallets'].get(coin,''),coin)]
 
 def autostart_enabled(path):
     parser=ConfigParser(interpolation=None)

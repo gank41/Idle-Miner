@@ -2,8 +2,8 @@
 import hashlib, json, math, re, time
 from dataclasses import dataclass
 
-VERSION = '1.9.3'
-BUILD = 15
+VERSION = '1.9.4'
+BUILD = 16
 DURATIONS = (15, 30, 60, 360, 720, 1440)
 COINS = ('BTC','LTC','DOGE','ETH')
 DEFAULTS = dict(coin='LTC', address='', wallets=dict.fromkeys(COINS,''), idle_threads=4, pause_active=False, pool_stats=True, show_dock=True, show_menu_bar=True, start_mining_at_login=False, automatic_update_checks=False, update_check_frequency='daily')

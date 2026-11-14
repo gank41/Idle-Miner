@@ -25,6 +25,9 @@ extension MinerApp {
   guard store.claimOwnership() else { statusItem.isVisible=false;return }
   statusItem.isVisible=true
   let snapshots=store.snapshots()
+  for peer in snapshots where pendingCurrencyLaunches[peer.profile]?.coin==peer.coin {
+   pendingCurrencyLaunches.removeValue(forKey:peer.profile)
+  }
   var selected=[String:MenuPeerSnapshot]()
   for peer in snapshots {
    if selected[peer.coin]==nil || peer.rank>selected[peer.coin]!.rank { selected[peer.coin]=peer }
@@ -38,15 +41,23 @@ extension MinerApp {
   for coin in Settings.coins {
    guard let row=sharedCurrencyRows[coin] else { continue }
    let peer=selected[coin]
-   let color=menuColor(peer?.level ?? "inactive")
-   row.attributedTitle=NSAttributedString(string:currencyName(coin),attributes:[.foregroundColor:color,.font:NSFont.menuFont(ofSize:13)])
-   row.image=NSImage(size:NSSize(width:10,height:10),flipped:false) { rect in color.setFill();NSBezierPath(ovalIn:rect.insetBy(dx:1,dy:1)).fill();return true }
-   row.image?.isTemplate=false
-   row.toolTip=peer?.lines.dropFirst().first ?? "Not running or status unavailable · open for details"
+   let level=peer?.level ?? "inactive"
+   if sharedCurrencyLevels[coin] != level {
+    sharedCurrencyLevels[coin]=level
+    let color=menuColor(level)
+    row.attributedTitle=NSAttributedString(string:currencyName(coin),attributes:[.foregroundColor:color,.font:NSFont.menuFont(ofSize:13)])
+    row.image=NSImage(size:NSSize(width:10,height:10),flipped:false) { rect in color.setFill();NSBezierPath(ovalIn:rect.insetBy(dx:1,dy:1)).fill();return true }
+    row.image?.isTemplate=false
+   }
+   let tip=peer?.lines.dropFirst().first ?? "Not running or status unavailable · open for details"
+   if row.toolTip != tip { row.toolTip=tip }
    if peer?.profile != profileName { sharedRemoteSummaries[coin]?.update(peer?.lines ?? ["Not running or status unavailable","Open this currency to configure or start mining.","Payout currency: \(coin)","No session work","Price unavailable","Pool balance unavailable"]) }
   }
   let overall=selected.values.contains{$0.level=="issue"} ? "issue" : selected.values.contains{$0.level=="working"} ? "working" : "inactive"
-  statusItem.button?.attributedTitle=NSAttributedString(string:"₿",attributes:[.foregroundColor:menuColor(overall),.font:NSFont.systemFont(ofSize:16,weight:.medium)])
+  if sharedIconLevel != overall {
+   sharedIconLevel=overall
+   statusItem.button?.attributedTitle=NSAttributedString(string:"₿",attributes:[.foregroundColor:menuColor(overall),.font:NSFont.systemFont(ofSize:16,weight:.medium)])
+  }
   statusItem.button?.toolTip="Idle Miner · \(selected.count) currency instance\(selected.count==1 ? "":"s") · open for per-currency status"
   rootLoginItem?.state=loginItem.state
   rootUpdateItem?.title=builtInUpdater.menuTitle
@@ -55,7 +66,7 @@ extension MinerApp {
  func currencyName(_ coin:String)->String { ["BTC":"Bitcoin (BTC)","LTC":"Litecoin (LTC)","DOGE":"Dogecoin (DOGE)","ETH":"Ethereum (ETH)"][coin] ?? coin }
  func buildUnifiedMenu(_ peers:[String:MenuPeerSnapshot]) {
   if let old=unifiedMenu { for row in old.items { row.submenu=nil } }
-  sharedCurrencyRows.removeAll();sharedRemoteSummaries.removeAll()
+  sharedCurrencyRows.removeAll();sharedRemoteSummaries.removeAll();sharedCurrencyLevels.removeAll()
   let menu=NSMenu();menu.autoenablesItems=false;menu.delegate=self
   for coin in Settings.coins {
    let row=NSMenuItem(title:currencyName(coin),action:nil,keyEquivalent:"")
@@ -82,7 +93,7 @@ extension MinerApp {
   rootLoginItem=add("Start at Login",#selector(toggleLoginItem),to:menu);rootLoginItem?.state=loginItem.state
   rootUpdateItem=add(builtInUpdater.menuTitle,#selector(checkForUpdates),to:menu)
   _=add("Wallet & Payout Help",#selector(showHelp),to:menu);_=add("About Idle Miner",#selector(showAbout),to:menu)
-  menu.addItem(.separator());_=add("Stop All Mining",#selector(stopAllCurrencies),to:menu);_=add("Quit Idle Miner",#selector(quitAllCurrencies),key:"q",to:menu)
+  menu.addItem(.separator());_=add("Start All Mining",#selector(startAllCurrencies),to:menu);_=add("Stop All Mining",#selector(stopAllCurrencies),to:menu);_=add("Quit Idle Miner",#selector(quitAllCurrencies),key:"q",to:menu)
   unifiedMenu=menu;statusItem.menu=menu
  }
  @objc func currencyMenuAction(_ item:NSMenuItem) {
@@ -100,6 +111,7 @@ extension MinerApp {
   switch action {
   case "stats":showStatistics()
   case "start":startMining()
+  case "startConfigured":startConfiguredCurrency()
   case "stop":stopMining()
   case "boost":if let minutes=minutes,TimedBoost.durations.contains(minutes) { beginBoost(minutes:minutes) }
   case "endBoost":endBoost()
@@ -110,7 +122,24 @@ extension MinerApp {
   default:break
   }
  }
+ func startConfiguredCurrency() {
+  guard !quitting,!enabled,!pendingRestart,benchmarkDeadline==nil,
+   let saved=try? Settings.load(from:settingsURL),saved.wallets[settings.coin]==settings.address,
+   Wallet.valid(settings.address,coin:settings.coin) else { return }
+  startMining()
+ }
+ @objc func startAllCurrencies() {
+  guard !quitting,!updateBlocksMining else { return }
+  refreshSharedSettings()
+  guard let saved=try? Settings.load(from:settingsURL) else { alert("Could not read the saved wallets. Open Settings and try again.");return }
+  let currencies=StartupPlan.configuredCurrencies(saved)
+  guard !currencies.isEmpty else { showSettings();formError.stringValue="Save a receive address to start mining.";return }
+  let requested=Date().timeIntervalSince1970
+  for coin in currencies { openCurrencyInstance(coin,startMining:true,showStats:false,groupStart:requested) }
+ }
  @objc func stopAllCurrencies() {
+  do { try sharedMenuStore?.recordStopAll() }
+  catch { alert("Could not cancel currencies still opening. \(error.localizedDescription)") }
   for peer in sharedMenuStore?.snapshots() ?? [] where peer.profile != profileName { try? sharedMenuStore?.send(peer,action:"stop") }
   stopMining()
  }

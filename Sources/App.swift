@@ -22,6 +22,9 @@ import AppKit
  var rootUpdateItem:NSMenuItem?
  var sharedMenuSignature=""
  var sharedMenuTracking=false
+ var sharedCurrencyLevels=[String:String]()
+ var sharedIconLevel:String?
+ var pendingCurrencyLaunches=[String:(coin:String,until:TimeInterval)]()
  var currencyMenus=[NSMenu]()
  var profileLaunchHandler:((String,[String])->Void)?
  let dockCheck=NSButton(checkboxWithTitle:"Show Dock icon",target:nil,action:nil)
@@ -152,6 +155,10 @@ import AppKit
   else if let argument=CommandLine.arguments.first(where:{$0.hasPrefix("--boost-minutes=")}),
      let minutes=Int(argument.dropFirst("--boost-minutes=".count)), TimedBoost.durations.contains(minutes) {
    beginBoost(minutes:minutes)
+  } else if let argument=CommandLine.arguments.first(where:{$0.hasPrefix("--start-configured-mining=")}),
+     let requested=TimeInterval(argument.dropFirst("--start-configured-mining=".count)),
+     sharedMenuStore?.permitsGroupLaunch(requested)==true {
+   startConfiguredCurrency()
   } else if CommandLine.arguments.contains("--start-mining") { startMining() }
 
   if CommandLine.arguments.contains("--show-stats") { showStatistics() }
@@ -207,6 +214,9 @@ import AppKit
   addCurrencyMenus(to:appMenu)
   _=add("Settings…",#selector(showSettings),key:",",to:appMenu)
   _=add("About Idle Miner",#selector(showAbout),to:appMenu)
+  appMenu.addItem(.separator())
+  _=add("Start All Mining",#selector(startAllCurrencies),to:appMenu)
+  _=add("Stop All Mining",#selector(stopAllCurrencies),to:appMenu)
   appMenu.addItem(.separator());_=add("Quit Idle Miner",#selector(quitApp),key:"q",to:appMenu)
   let appItem=NSMenuItem();appItem.submenu=appMenu;main.insertItem(appItem,at:0)
  }
@@ -249,9 +259,9 @@ import AppKit
  }
  func tick() {
   guard engine != nil else { return }
+  refreshSharedSettings()
   drainSharedMenuCommands()
   guard !quitting else { return }
-  refreshSharedSettings()
   builtInUpdater.pollAutomaticChecks()
   sessionClock.sample(hashing:engine.ready && !engine.isStopping && !engine.isChanging && (localStats.currentRate() ?? 0)>0)
   if statisticsNetworkingEnabled { statsService.refresh(coin:settings.coin,address:settings.address) }
@@ -315,7 +325,7 @@ import AppKit
   rateItem.title=engine.running ? "RandomX: \(rate) H/s → \(settings.coin)" : "Payout currency: \(settings.coin)"
   sharesItem.title="Pool-accepted shares this session: \(localStats.accepted)"
   startItem.isEnabled = !enabled && !engine.running
-  statusItem.button?.toolTip="Idle Miner · \(settings.coin) · \(stateItem.title)"
+  if unifiedMenu==nil { statusItem.button?.toolTip="Idle Miner · \(settings.coin) · \(stateItem.title)" }
   for menu in currencyMenus { for item in menu.items { item.state=item.representedObject as? String==settings.coin ? .on : .off } }
  }
  func readLine(_ line:String) {
@@ -349,7 +359,7 @@ import AppKit
     if secondary { field.textColor = .secondaryLabelColor }
     stack.addArrangedSubview(field); field.widthAnchor.constraint(equalTo:stack.widthAnchor).isActive=true
    }
-   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.9.3"
+   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.9.4"
    let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "15"
    centered("Idle Miner",size:24,bold:true)
    centered("By Jeffry Zander",size:14)

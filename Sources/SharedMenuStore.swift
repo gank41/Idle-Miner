@@ -23,7 +23,7 @@ struct MenuPeerCommand:Codable {
 }
 // Local, per-user IPC only. No sockets, addresses, URLs or executable commands.
 final class SharedMenuStore {
- static let actions:Set<String>=["stats","start","stop","boost","endBoost","settings","pool","log","quit"]
+ static let actions:Set<String>=["stats","start","startConfigured","stop","boost","endBoost","settings","pool","log","quit"]
  let base:URL
  let profile:String
  let nonce=UUID().uuidString
@@ -53,6 +53,16 @@ final class SharedMenuStore {
   let item=MenuPeerSnapshot(pid:getpid(),profile:profile,coin:coin,nonce:nonce,updated:now,level:level,enabled:enabled,lines:safe)
   try write(item,to:directory.appendingPathComponent("snapshot-\(profile).json"));lastContent=content;lastPublish=now
  }
+ func recordStopAll()throws {
+  try write(Date().timeIntervalSince1970,to:directory.appendingPathComponent("stop-all.json"))
+ }
+ func permitsGroupLaunch(_ requested:TimeInterval,now:TimeInterval=Date().timeIntervalSince1970)->Bool {
+  guard (0...30).contains(now-requested) else { return false }
+  let url=directory.appendingPathComponent("stop-all.json")
+  guard FileManager.default.fileExists(atPath:url.path) else { return true }
+  guard let data=try? Data(contentsOf:url),let stopped=try? JSONDecoder().decode(TimeInterval.self,from:data) else { return false }
+  return requested>stopped
+ }
  func snapshots(now:TimeInterval=Date().timeIntervalSince1970)->[MenuPeerSnapshot] {
   (["default"]+Settings.coins).compactMap { key in
    guard let data=try? Data(contentsOf:directory.appendingPathComponent("snapshot-\(key).json")),data.count<=8192,
@@ -80,7 +90,7 @@ final class SharedMenuStore {
    return command
   }.sorted { a,b in
    if a.created != b.created { return a.created<b.created }
-   let priority=["start":1,"boost":2,"endBoost":3,"stop":8,"quit":9]
+   let priority=["start":1,"startConfigured":1,"boost":2,"endBoost":3,"stop":8,"quit":9]
    return priority[a.action,default:0]<priority[b.action,default:0]
   }
  }

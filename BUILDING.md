@@ -52,6 +52,22 @@ See [Linux README](Linux/README.txt) for prerequisites and installed paths.
 
 ## Release packages
 
+The local release archive lives in `Installers/`, which is excluded from Git:
+
+- `Installers/CURRENT/` contains only the latest published release: the Mac DMG,
+  Linux installer archive, matching source archive, guide, license, and checksums.
+- `Installers/OLD/` contains all previous releases, draft packages, old app backups,
+  source snapshots, and historical disk-image layouts. Keep distinct copies in
+  named subfolders; never overwrite a published archive.
+
+For the next release, first move the complete existing `CURRENT` set into
+`Installers/OLD/Releases/Cloudflare-VERSION/`, using that release's actual version.
+Prepare and verify the next complete release in `CURRENT`. If a release needs
+staging or a draft copy, use a named subfolder under `OLD`, not another top-level
+installer folder. Download-folder copies are conveniences, not the canonical
+archive. Keep development output (`Idle Miner.app`), bundled dependencies, and
+private runtime wallet/settings data in their existing build/runtime locations.
+
 Prebuilt Mac disk images, Linux source installers, and corresponding source
 snapshots are hosted at [idleminer.app](https://idleminer.app/#downloads) on
 Cloudflare Pages, outside Git history. The GitHub repository remains the public

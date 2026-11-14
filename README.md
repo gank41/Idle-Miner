@@ -42,20 +42,20 @@ Mining means using your CPU to perform calculations for a cryptocurrency network
 
 ## Make it yours
 
-Current release: **1.9.3 · Build 15** · [What's new](docs/releases/v1.9.3.md)
+Current release: **1.9.4 · Build 16** · [What's new](docs/releases/v1.9.4.md)
 
 | | macOS | Linux |
 | --- | --- | --- |
-| **Download** | **[Download for Mac ↓](https://idleminer.app/downloads/v1.9.3/Idle-Miner-1.9.3-macOS.dmg)** | **[Download for Linux ↓](https://idleminer.app/downloads/v1.9.3/Idle-Miner-1.9.3-Linux.tar.gz)** |
+| **Download** | **[Download for Mac ↓](https://idleminer.app/downloads/v1.9.4/Idle-Miner-1.9.4-macOS.dmg)** | **[Download for Linux ↓](https://idleminer.app/downloads/v1.9.4/Idle-Miner-1.9.4-Linux.tar.gz)** |
 | **Your computer** | Apple Silicon · macOS 14 or later | 64-bit ARM64 or x86_64 · supported desktop distribution |
 | **Install** | Open the DMG and drag Idle Miner to Applications. | Extract the archive, open Terminal in its folder, and run `bash install.sh` as your desktop user. |
 | **At a glance** | Native Mac app, menu bar controls, optional Dock icon, resizable Mining Stats. | Fedora, Fedora Asahi, Ubuntu and recent Debian-family desktops with the required packages. |
 
-The Mac release is Developer ID signed with hardened runtime. See [release verification notes](docs/releases/v1.9.3.md) for notarization and platform coverage. There is no Intel Mac installer in this release.
+The Mac release is Developer ID signed with hardened runtime. See [release verification notes](docs/releases/v1.9.4.md) for notarization and platform coverage. There is no Intel Mac installer in this release.
 
 Linux builds locally and needs internet for dependencies. The installer may request sudo for system packages; Qt 6 / PySide6 and KDE Frameworks 6 development packages must be available. Older distributions may lack them. Native Asahi hardware operation remains unverified.
 
-[Installation help](HOWTO.md) · [SHA-256 checksums](https://idleminer.app/downloads/v1.9.3/SHA256SUMS.txt) · [Matching source archive](https://idleminer.app/downloads/v1.9.3/Idle-Miner-1.9.3-source.tar.gz)
+[Installation help](HOWTO.md) · [SHA-256 checksums](https://idleminer.app/downloads/v1.9.4/SHA256SUMS.txt) · [Matching source archive](https://idleminer.app/downloads/v1.9.4/Idle-Miner-1.9.4-source.tar.gz)
 
 ## Small app. Useful controls.
 
@@ -75,7 +75,7 @@ Each running currency needs its own roughly 2 GB RandomX dataset. More currencie
 
 1. **Install** the package for your computer.
 2. **Open Settings** and paste your chosen currency's public **Receive address**, on its native network. Never enter a password, private key or recovery phrase.
-3. **Choose Start Mining**, then open Mining Stats to see local work and provider reporting.
+3. **Choose Start Mining** for one currency or **Start All Mining** for every currency with a valid saved address. Open Mining Stats to see local work and provider reporting.
 
 You can also run the one-thread **Offline Test** for up to 70 seconds without a wallet or pool connection. It checks local hashing and earns nothing.
 

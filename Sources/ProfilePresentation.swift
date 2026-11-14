@@ -38,11 +38,14 @@ extension MinerApp {
   guard let coin=sender.representedObject as? String else { return }
   openCurrencyInstance(coin,startMining:false,showStats:true)
  }
- func openCurrencyInstance(_ coin:String,startMining:Bool,showStats:Bool,showSettings:Bool=false,boostMinutes:Int?=nil) {
+ func openCurrencyInstance(_ coin:String,startMining:Bool,showStats:Bool,showSettings:Bool=false,boostMinutes:Int?=nil,groupStart:TimeInterval?=nil) {
   guard Settings.coins.contains(coin) else { return }
   if settings.coin==coin {
    if boostMinutes != nil { performCurrencyCommand("boost",minutes:boostMinutes) }
-   else if startMining { self.startMining() }
+   else if startMining {
+    if groupStart != nil { startConfiguredCurrency() }
+    else { self.startMining() }
+   }
    if showSettings { self.showSettings() } else if showStats { showStatistics() };return
   }
   // A profile is a stable process slot, not proof of its current payout currency.
@@ -50,20 +53,29 @@ extension MinerApp {
   if let peer=sharedMenuStore?.snapshots().filter({$0.coin==coin}).max(by:{$0.rank<$1.rank}) {
    do {
     if let minutes=boostMinutes { try sharedMenuStore?.send(peer,action:"boost",minutes:minutes) }
-    else if startMining { try sharedMenuStore?.send(peer,action:"start") }
+    else if startMining { try sharedMenuStore?.send(peer,action:groupStart == nil ? "start" : "startConfigured") }
     if showStats || showSettings { try sharedMenuStore?.send(peer,action:showSettings ? "settings":"stats") }
    } catch { alert(error.localizedDescription) };return
   }
+  let now=ProcessInfo.processInfo.systemUptime
+  pendingCurrencyLaunches=pendingCurrencyLaunches.filter{ $0.value.until>now }
+  if pendingCurrencyLaunches.values.contains(where:{$0.coin==coin}) { return }
   let candidates=[coin]+(["default"]+Settings.coins).filter{$0 != coin}
-  guard let slot=candidates.first(where:{$0 != profileName && ProfileCoordinator.existingPID(base:baseFolder,profile:$0)==nil}) else {
+  guard let slot=candidates.first(where:{$0 != profileName && pendingCurrencyLaunches[$0]==nil && ProfileCoordinator.existingPID(base:baseFolder,profile:$0)==nil}) else {
    alert("All currency process slots are occupied. Close an unused currency instance, then open \(coin) again.");return
   }
   let configuration=NSWorkspace.OpenConfiguration();configuration.createsNewApplicationInstance=true
-  configuration.arguments=["--profile=\(slot)"]+(slot==coin ? [] : ["--currency=\(coin)"])+(boostMinutes.map{TimedBoost.durations.contains($0) ? ["--boost-minutes=\($0)"] : []} ?? (startMining ? ["--start-mining"] : []))+(showStats ? ["--show-stats"] : [])+(showSettings ? ["--show-settings"] : [])
+  configuration.arguments=["--profile=\(slot)"]+(slot==coin ? [] : ["--currency=\(coin)"])+(boostMinutes.map{TimedBoost.durations.contains($0) ? ["--boost-minutes=\($0)"] : []} ?? (startMining ? [groupStart.map{"--start-configured-mining=\($0)"} ?? "--start-mining"] : []))+(showStats ? ["--show-stats"] : [])+(showSettings ? ["--show-settings"] : [])
   configuration.activates=showStats || showSettings
   if let handler=profileLaunchHandler { handler(coin,configuration.arguments);return }
+  pendingCurrencyLaunches[slot]=(coin,now+10)
   NSWorkspace.shared.openApplication(at:Bundle.main.bundleURL,configuration:configuration) { _,error in
-   if let error=error { DispatchQueue.main.async { self.alert("Could not open another instance. \(error.localizedDescription)") } }
+   if let error=error {
+    DispatchQueue.main.async {
+     self.pendingCurrencyLaunches.removeValue(forKey:slot)
+     self.alert("Could not open another instance. \(error.localizedDescription)")
+    }
+   }
   }
  }
  func applyVisibility() {

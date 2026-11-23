@@ -42,7 +42,9 @@ Mining means using your CPU to perform calculations for a cryptocurrency network
 
 ## Make it yours
 
-Current release: **1.9.5 · Build 17** · [What's new](docs/releases/v1.9.5.md)
+**Current release · 1.9.5 (build 17)** · [GitHub release notes](https://github.com/gank41/Idle-Miner/releases/tag/v1.9.5)
+
+**Fedora update fix.** If your install or update stopped near 99% with an error in `TlsGen.cpp`, 1.9.5 fixes the build with OpenSSL 4. If Idle Miner won’t open, use the Linux download below and follow the **Install** row. Your saved wallets and settings carry over.
 
 | | macOS | Linux |
 | --- | --- | --- |
@@ -51,7 +53,7 @@ Current release: **1.9.5 · Build 17** · [What's new](docs/releases/v1.9.5.md)
 | **Install** | Open the DMG and drag Idle Miner to Applications. | Extract the archive, open Terminal in its folder, and run `bash install.sh` as your desktop user. |
 | **At a glance** | Native Mac app, menu bar controls, optional Dock icon, resizable Mining Stats. | Fedora, Fedora Asahi, Ubuntu and recent Debian-family desktops with the required packages. |
 
-The Mac release is Developer ID signed with hardened runtime. See [release verification notes](docs/releases/v1.9.5.md) for notarization and platform coverage. There is no Intel Mac installer in this release.
+The Mac app is Developer ID signed, uses hardened runtime, and is notarized by Apple.
 
 Linux builds locally and needs internet for dependencies. The installer may request sudo for system packages; Qt 6 / PySide6 and KDE Frameworks 6 development packages must be available. Older distributions may lack them. Native Asahi hardware operation remains unverified.
 

@@ -23,6 +23,7 @@ for name in ('app.py','core.py','coordination.py','shared_tray.py','updates.py',
 for source,name in ((build/'xmrig-build/xmrig','xmrig'),(build/'idle-build/idle-monitor','idle-monitor'),(build/'miner-supervisor','miner-supervisor')):
  shutil.copy2(source,root/name);(root/name).chmod(0o755)
 shutil.copy2('vendor/xmrig-6.26.0.tar.gz',root/'xmrig-6.26.0-source.tar.gz')
+shutil.copy2('vendor/TlsGen.cpp',root/'TlsGen.cpp')
 shutil.copytree('idle-helper',root/'idle-helper-source',dirs_exist_ok=True)
 shutil.copy2('supervisor.c',root/'supervisor.c')
 if stage:

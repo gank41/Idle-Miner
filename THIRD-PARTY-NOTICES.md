@@ -6,6 +6,8 @@ Idle Miner's original application source is released under **GNU GPL version 3.0
 
 Idle Miner uses the upstream XMRig CPU mining engine. Its source notices license it under **GPL version 3 or later**. The pinned upstream source archive is included at `Linux/vendor/xmrig-6.26.0.tar.gz`; the installer verifies it before compiling. The source archive includes XMRig's license and component notices. The Mac app includes an XMRig license notice, and the release provides the matching upstream engine source.
 
+The Linux build replaces `src/base/net/tls/TlsGen.cpp` in the extracted tree with `Linux/vendor/TlsGen.cpp` to support OpenSSL 4. The installer includes both the original archive and the modified file.
+
 - [Upstream source at v6.26.0](https://github.com/xmrig/xmrig/tree/v6.26.0)
 - [XMRig license](https://github.com/xmrig/xmrig/blob/v6.26.0/LICENSE)
 

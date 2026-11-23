@@ -1,5 +1,9 @@
 # Changes
 
+## 1.9.5 — build 17
+
+Fix the Linux engine build on Fedora with OpenSSL 4. Installer diagnostics now expand in the Linux update window. See [release notes](docs/releases/v1.9.5.md).
+
 ## 1.9.4 — build 16
 
 Start All Mining in the Mac and Linux menus enables mining for each currency with a valid saved wallet. Stop All Mining also cancels pending group launches. Linux gains group stop in its window and tray menus and can open a missing currency when its usual process slot is occupied. Tray refreshes reuse unchanged icons. See [release notes](docs/releases/v1.9.4.md).

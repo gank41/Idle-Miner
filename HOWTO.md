@@ -6,31 +6,31 @@ A public **Receive address** tells the provider where to send a payout. Idle Min
 
 ## Download
 
-Get the current packages from the [Idle Miner website](https://idleminer.app/#downloads). For version **1.9.4 (build 16)**, choose:
+Get the current packages from the [Idle Miner website](https://idleminer.app/#downloads). For version **1.9.5 (build 17)**, choose:
 
 | Computer | Download |
 | --- | --- |
-| Apple Silicon Mac, macOS 14 or later | `Idle-Miner-1.9.4-macOS.dmg` |
-| Supported 64-bit ARM or x86 Linux desktop | `Idle-Miner-1.9.4-Linux.tar.gz` |
+| Apple Silicon Mac, macOS 14 or later | `Idle-Miner-1.9.5-macOS.dmg` |
+| Supported 64-bit ARM or x86 Linux desktop | `Idle-Miner-1.9.5-Linux.tar.gz` |
 
-The Linux download is a source installer that builds the engine on your computer. It needs Python/PySide6, Qt 6, KDE Frameworks 6 development packages, and compiler dependencies from your distribution repositories. Fedora, Fedora Asahi, and recent Ubuntu/Debian-family systems are supported by the installer; older releases may lack the required packages. Native Asahi operation has not been verified. See the [release notes](docs/releases/v1.9.4.md) for testing details.
+The Linux download is a source installer that builds the engine on your computer. It needs Python/PySide6, Qt 6, KDE Frameworks 6 development packages, and compiler dependencies from your distribution repositories. Fedora, Fedora Asahi, and recent Ubuntu/Debian-family systems are supported by the installer; older releases may lack the required packages. Native Asahi operation has not been verified. See the [release notes](docs/releases/v1.9.5.md) for testing details.
 
 ## Install on a Mac
 
 1. If updating, select **Stop** and **Quit** in **every** Idle Miner currency instance before replacing the app.
-2. Open `Idle-Miner-1.9.4-macOS.dmg`.
+2. Open `Idle-Miner-1.9.5-macOS.dmg`.
 3. Drag **Idle Miner** into **Applications**. Replace the previous copy if updating.
 4. Eject the mounted disk and open **Idle Miner** from Applications.
 
 Existing wallets and settings remain in your user account. The app normally opens stopped. Open any additional currency instances again and start them when ready.
 
-This Mac release is **Developer ID signed** with hardened runtime. Check the [1.9.4 release notes](docs/releases/v1.9.4.md) for Apple notarization status; Developer ID signing by itself does not mean Apple has notarized the download. If macOS blocks first launch, only proceed if you trust the source and downloaded app. After trying to open it, Apple's documented process is **System Settings → Privacy & Security → Open Anyway**, then confirm **Open** if available. Read [Apple's instructions and warnings](https://support.apple.com/en-us/102445) first. A warning that the app is damaged or will harm your computer requires investigation before opening it.
+This Mac release is **Developer ID signed** with hardened runtime. Check the [1.9.5 release notes](docs/releases/v1.9.5.md) for Apple notarization status; Developer ID signing by itself does not mean Apple has notarized the download. If macOS blocks first launch, only proceed if you trust the source and downloaded app. After trying to open it, Apple's documented process is **System Settings → Privacy & Security → Open Anyway**, then confirm **Open** if available. Read [Apple's instructions and warnings](https://support.apple.com/en-us/102445) first. A warning that the app is damaged or will harm your computer requires investigation before opening it.
 
 ## Install on Linux
 
 1. If updating, stop mining and quit **all** Idle Miner windows/profiles.
-2. Extract `Idle-Miner-1.9.4-Linux.tar.gz`.
-3. Open Terminal in the extracted `Idle-Miner-1.9.4-Linux` folder.
+2. Extract `Idle-Miner-1.9.5-Linux.tar.gz`.
+3. Open Terminal in the extracted `Idle-Miner-1.9.5-Linux` folder.
 4. Run:
 
    ```sh

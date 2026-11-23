@@ -359,8 +359,8 @@ import AppKit
     if secondary { field.textColor = .secondaryLabelColor }
     stack.addArrangedSubview(field); field.widthAnchor.constraint(equalTo:stack.widthAnchor).isActive=true
    }
-   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "1.9.4"
-   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "15"
+   let version=Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "unknown"
+   let build=Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "unknown"
    centered("Idle Miner",size:24,bold:true)
    centered("By Jeffry Zander",size:14)
    centered("Version \(version) (\(build))",secondary:true)

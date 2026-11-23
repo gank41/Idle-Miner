@@ -50,6 +50,12 @@ assert not any(b.isVisible() for b in w.update_dialog.findChildren(QToolButton))
 # A fresh signed available release keeps the installation path and expanded notes.
 w.update_result({'manifest':release,'error':''});assert w.update_install.isVisible() and w.update_install.isEnabled() and w.update_notes.isVisible()
 w.update_preparing=True;w.update_cancel.clear();w.quit();assert not w.quitting and w.update_cancel.is_set()
+w.update_failed('Build failed.\n\nCompiler diagnostic')
+notes_button=w.update_notes_toggle
+assert w.update_status.text()=='Build failed.' and not w.update_notes.isVisible()
+assert notes_button.isVisible() and notes_button.text()=='Build Details'
+notes_button.click()
+assert w.update_notes.isVisible() and w.update_notes.toPlainText()=='Compiler diagnostic'
 w.update_failed('Cancelled fixture');assert 'Cancelled fixture' in w.update_status.text()
 assert not w.update_notes.isVisible() and not w.update_notes_toggle.isVisible()
 w.update_dialog.close();w.quit()

@@ -467,6 +467,7 @@ class Window(QMainWindow):
    self.update_versions.setText(f'Installed: Idle Miner {VERSION} ({BUILD})\nLatest: unavailable');self.update_status.setText(result['error']);self.update_dialog.adjustSize();return
   release=result['manifest']
   self.update_versions.setText(f"Installed: Idle Miner {VERSION} ({BUILD})\nLatest: Idle Miner {release['version']} ({release['build']})")
+  self.update_notes_toggle.setText('Release Notes')
   self.update_notes.setPlainText(release['releaseNotesText'])
   has_notes=bool(release['releaseNotesText'].strip())
   if not newer(release['version'],release['build'],VERSION,BUILD):
@@ -481,9 +482,15 @@ class Window(QMainWindow):
  def update_failed(self,message):
   self.update_preparing=False
   if self.quitting:return
-  self.update_progress(message)
+  summary,_,detail=message.partition('\n\n')
+  self.update_progress(summary)
   if self.update_dialog and self.update_dialog.isVisible():
-   self.update_notes_toggle.setChecked(False);self.update_notes_toggle.hide();self.update_notes.hide();self.update_install.setEnabled(bool(self.update_release));self.update_dialog.adjustSize()
+   self.update_notes_toggle.setChecked(False)
+   self.update_notes.setPlainText(detail)
+   self.update_notes_toggle.setText('Build Details')
+   self.update_notes_toggle.setVisible(bool(detail))
+   self.update_notes.hide()
+   self.update_install.setEnabled(bool(self.update_release));self.update_dialog.adjustSize()
  def install_update(self):
   if self.update_preparing or not self.update_release:return
   self.update_preparing=True;self.update_install.setEnabled(False);release=dict(self.update_release);cancel=self.update_cancel

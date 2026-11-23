@@ -5,7 +5,7 @@ if [[ $(uname -s) != Linux || ! -f /etc/os-release ]]; then echo 'Run this insta
 if [[ $EUID == 0 ]]; then echo 'Run as your normal desktop user, not with sudo. The installer asks for sudo only for dependencies.'; exit 1; fi
 if [[ $(uname -m) != aarch64 && $(uname -m) != x86_64 ]]; then echo 'A 64-bit ARM or x86 Linux system is required.'; exit 1; fi
 source /etc/os-release
-printf '%s\n' 'Installing Idle Miner 1.9.4 (build 16) for this user. Installing never starts mining; login mining requires an explicit Settings opt-in.'
+printf '%s\n' 'Installing Idle Miner 1.9.5 (build 17) for this user. Installing never starts mining; login mining requires an explicit Settings opt-in.'
 case " $ID ${ID_LIKE:-} " in
  *fedora*)
   packages=(openssl python3-pyside6 gcc gcc-c++ libstdc++-static cmake make libuv-devel openssl-devel hwloc-devel kf6-kidletime-devel qt6-qtwayland)
@@ -29,14 +29,15 @@ printf '%s\n' '5005144e78571f26586410c2b2ede2b0c72afe22f97f1708ea24cfb253c3939b 
 build_dir=$(mktemp -d)
 trap 'rm -rf -- "$build_dir"' EXIT
 tar -xzf vendor/xmrig-6.26.0.tar.gz -C "$build_dir"
+cp vendor/TlsGen.cpp "$build_dir/xmrig-6.26.0/src/base/net/tls/TlsGen.cpp"
 cmake -S "$build_dir/xmrig-6.26.0" -B "$build_dir/xmrig-build" -DCMAKE_BUILD_TYPE=Release -DWITH_OPENCL=OFF -DWITH_CUDA=OFF -DWITH_MSR=OFF -DWITH_HTTP=OFF -DCMAKE_EXE_LINKER_FLAGS=-Wl,-z,max-page-size=16384
 cmake --build "$build_dir/xmrig-build" -j2
 cmake -S idle-helper -B "$build_dir/idle-build" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$build_dir/idle-build" -j2
 cc -Wall -Wextra -O2 supervisor.c -o "$build_dir/miner-supervisor"
-env -u IDLE_MINER_STAGE -u IDLE_MINER_UPDATE IDLE_MINER_SUPERVISOR="$build_dir/miner-supervisor" python3 -m unittest discover -s tests -v
+env -u IDLE_MINER_STAGE -u IDLE_MINER_UPDATE IDLE_MINER_SUPERVISOR="$build_dir/miner-supervisor" /usr/bin/python3 -m unittest discover -s tests -v
 # A built-in update stages privately; the detached helper acquires all leases before the final swap.
 export IDLE_MINER_BUILD="$build_dir"
-python3 install_files.py
+/usr/bin/python3 install_files.py
 if [[ ${IDLE_MINER_UPDATE:-0} == 1 ]]; then printf '%s\n' 'Prepared the update without changing the current installation.'; exit 0; fi
 printf '\n%s\n' 'Installed. Open Idle Miner from your application launcher, then Settings.' 'You can delete this extracted installer folder; keep the original archive to reinstall.'

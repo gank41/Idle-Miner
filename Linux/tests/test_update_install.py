@@ -126,7 +126,7 @@ class InstallerStagingTests(unittest.TestCase):
    for relative in ('xmrig-build/xmrig','idle-build/idle-monitor','miner-supervisor'):
     path=build/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('binary')
    for name in ('app.py','core.py','coordination.py','shared_tray.py','updates.py','startup.py','platform_linux.py','network.py','icon.png','update_public_key.txt','README.txt','LICENSE.txt','supervisor.c'):(source/name).write_text('fixture')
-   (source/'vendor').mkdir();(source/'vendor/xmrig-6.26.0.tar.gz').write_text('source');(source/'idle-helper').mkdir();(source/'idle-helper/main.cpp').write_text('helper')
+   (source/'vendor').mkdir();(source/'vendor/TlsGen.cpp').write_text('compatibility source');(source/'vendor/xmrig-6.26.0.tar.gz').write_text('source');(source/'idle-helper').mkdir();(source/'idle-helper/main.cpp').write_text('helper')
    env={**os.environ,'HOME':str(home),'IDLE_MINER_BUILD':str(build),'IDLE_MINER_STAGE':str(stage),'IDLE_MINER_UPDATE':'1'}
    result=subprocess.run([sys.executable,str(Path(__file__).resolve().parents[1]/'install_files.py')],cwd=source,env=env,capture_output=True,text=True)
    self.assertEqual(result.returncode,0,result.stderr);self.assertTrue((stage/'app.py').is_file());self.assertTrue(os.access(stage/'xmrig',os.X_OK));self.assertFalse((home/'.local').exists());self.assertFalse((home/'.config').exists())

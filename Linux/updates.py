@@ -235,7 +235,9 @@ def prepare_update(release,workspace,cancel,progress=lambda text:None):
    except subprocess.TimeoutExpired:os.killpg(process.pid,signal.SIGKILL);process.wait()
    raise
  if process.returncode:
-  detail=log.read_text(errors='replace')[-2400:]
+  with log.open('rb') as failed_log:
+   failed_log.seek(max(0,log.stat().st_size-8192))
+   detail=failed_log.read().decode(errors='replace').strip()
   raise ValueError('The update could not be prepared. Your app is still installed.\n\n'+detail)
  cancelled(cancel);validate_stage(stage)
  # Check version without importing or running the staged app.
